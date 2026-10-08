@@ -19,17 +19,18 @@ if "base_dados_utilizadores" not in st.session_state:
       }
   }
 
+# Inicializa o dicionário completo para até 10 granjas
+aves_iniciais = {f"Granja {i}": (62000 if i <= 2 else 0) for i in range(1, 11)}
+silos_iniciais = {f"Granja {i}": 0.0 for i in range(1, 11)}
+
 if "lote_config" not in st.session_state:
   st.session_state.lote_config = {
       "sitio": "Sítio Boa Vista",
       "lote": "Lote 01 - NÚCLEO 1",
       "inicio": "23/08/2026",
-      "sexo": "Machos",
-      "linhagem": "COBB",
-      "aves_g1": 62000,
-      "aves_g2": 61900,
-      "estoque_silo_g1": 0.0,
-      "estoque_silo_g2": 0.0,
+      "num_granjas": 2,  # Abre por padrão com 2, editável até 10
+      "aves": aves_iniciais,
+      "estoque_silo": silos_iniciais,
   }
 
 if "historico_lotes" not in st.session_state:
@@ -45,21 +46,23 @@ if "historico_lotes" not in st.session_state:
 
 if "df_mortalidade" not in st.session_state:
   dias = [f"Dia {i}" for i in range(1, 46)]
-  st.session_state.df_mortalidade = pd.DataFrame(
-      {"Dia": dias, "Granja 1": [0] * 45, "Granja 2": [0] * 45}
-  )
+  dict_mort = {"Dia": dias}
+  for i in range(1, 11):
+    dict_mort[f"Granja {i}"] = [0] * 45
+  st.session_state.df_mortalidade = pd.DataFrame(dict_mort)
 
 if "df_racao" not in st.session_state:
-  st.session_state.df_racao = pd.DataFrame({
+  dict_rac = {
       "Nº Caminhão / Nota": [f"Caminhão {i}" if i <= 5 else "" for i in range(1, 41)],
       "Data": ["" for _ in range(40)],
-      "Granja 1 (Kg)": [0.0 for _ in range(40)],
-      "Granja 2 (Kg)": [0.0 for _ in range(40)],
-      "Fórmula / Tipo": ["" for _ in range(40)],
-  })
+  }
+  for i in range(1, 11):
+    dict_rac[f"Granja {i} (Kg)"] = [0.0 for _ in range(40)]
+  dict_rac["Fórmula / Tipo"] = ["" for _ in range(40)]
+  st.session_state.df_racao = pd.DataFrame(dict_rac)
 
 if "df_balanca" not in st.session_state:
-  st.session_state.df_balanca = pd.DataFrame({
+  dict_bal = {
       "Semana / Idade": [
           "1ª Semana (7 dias)",
           "2ª Semana (14 dias)",
@@ -67,10 +70,11 @@ if "df_balanca" not in st.session_state:
           "4ª Semana (28 dias)",
           "5ª Semana (35 dias)",
           "6ª Semana (42 dias)",
-      ],
-      "Granja 1 (Peso g)": [0.0] * 6,
-      "Granja 2 (Peso g)": [0.0] * 6,
-  })
+      ]
+  }
+  for i in range(1, 11):
+    dict_bal[f"Granja {i} (Peso g)"] = [0.0] * 6
+  st.session_state.df_balanca = pd.DataFrame(dict_bal)
 
 if "df_medicacao" not in st.session_state:
   dias_med = [f"Dia {i}" for i in range(1, 46)]
@@ -83,7 +87,7 @@ if "df_medicacao" not in st.session_state:
 
 if "lembretes_manutencao" not in st.session_state:
   st.session_state.lembretes_manutencao = (
-      "- Verificar bicos de nipple da Granja 1.\n- Agendar manutenção do"
+      "- Verificar bicos de nipple das granjas.\n- Agendar manutenção do"
       " gerador."
   )
 
@@ -148,7 +152,6 @@ if not st.session_state.autenticado:
             "Este e-mail já está registado. Utilize a aba 'Entrar' para aceder."
         )
       else:
-        # Gravar na base de dados e autenticar automaticamente
         st.session_state.base_dados_utilizadores[email_cad] = {
             "senha": senha_cad,
             "nome": nome_cad,
@@ -166,7 +169,6 @@ if not st.session_state.autenticado:
 
 # ==================== APLICAÇÃO PRINCIPAL (PÓS-LOGIN) ====================
 else:
-  # Cabeçalho Principal com Botão de Terminar Sessão
   col_cab1, col_cab2 = st.columns([4, 1])
   with col_cab1:
     st.markdown(
@@ -185,7 +187,6 @@ else:
 
   st.write("")
 
-  # Menu de Navegação Horizontal
   menu = st.radio(
       "Navegação",
       [
@@ -203,23 +204,31 @@ else:
 
   st.divider()
 
-  # Cálculos Globais Auxiliares
-  total_aloj_g1 = st.session_state.lote_config["aves_g1"]
-  total_aloj_g2 = st.session_state.lote_config["aves_g2"]
-  mortes_g1_total = st.session_state.df_mortalidade["Granja 1"].sum()
-  mortes_g2_total = st.session_state.df_mortalidade["Granja 2"].sum()
+  # Variáveis dinâmicas para o número de granjas ativas (1 a 10)
+  num_g = st.session_state.lote_config["num_granjas"]
+  granjas_ativas = [f"Granja {i}" for i in range(1, num_g + 1)]
 
-  saldo_g1 = total_aloj_g1 - mortes_g1_total
-  saldo_g2 = total_aloj_g2 - mortes_g2_total
-  saldo_total_aves = saldo_g1 + saldo_g2
+  total_aloj_geral = sum(
+      st.session_state.lote_config["aves"][g] for g in granjas_ativas
+  )
+  mortes_geral_total = sum(
+      st.session_state.df_mortalidade[g].sum() for g in granjas_ativas
+  )
+  saldo_geral_vivas = total_aloj_geral - mortes_geral_total
 
-  racao_chegada_g1 = st.session_state.df_racao["Granja 1 (Kg)"].sum()
-  racao_chegada_g2 = st.session_state.df_racao["Granja 2 (Kg)"].sum()
-  racao_chegada_total = racao_chegada_g1 + racao_chegada_g2
+  racao_chegada_geral = sum(
+      st.session_state.df_racao[f"{g} (Kg)"].sum() for g in granjas_ativas
+  )
+  estoque_silo_geral = sum(
+      st.session_state.lote_config["estoque_silo"][g] for g in granjas_ativas
+  )
+  racao_utilizada_geral = max(
+      0.0, racao_chegada_geral - estoque_silo_geral
+  )
 
   # ==================== 1. INÍCIO ====================
   if menu == "🏠 Início":
-    st.subheader("Configuração do Sítio, Lote e Aves")
+    st.subheader("Configuração do Sítio, Lote e Aviários/Granjas")
 
     with st.form("form_config_lote"):
       sitio_input = st.text_input(
@@ -228,19 +237,46 @@ else:
       lote_input = st.text_input(
           "Identificação do Lote", value=st.session_state.lote_config["lote"]
       )
-      cfg_g1 = st.number_input(
-          "Aves Alojadas - Granja 1", value=int(total_aloj_g1), step=100
+
+      # Seletor flexível de 1 a 10 granjas
+      num_granjas_input = st.selectbox(
+          "Número de Granjas/Aviários Ativos (1 a 10)",
+          options=list(range(1, 11)),
+          index=num_g - 1,
       )
-      cfg_g2 = st.number_input(
-          "Aves Alojadas - Granja 2", value=int(total_aloj_g2), step=100
-      )
+
+      st.markdown("---")
+      st.write("### Aves Alojadas por Granja")
+      aves_temp = {}
+
+      # Organiza os inputs de aves em grelha de colunas (máx 3 colunas por linha visualmente)
+      for i in range(1, num_granjas_input + 1):
+        g_nome = f"Granja {i}"
+        val_atual = int(st.session_state.lote_config["aves"].get(g_nome, 0))
+        aves_temp[g_nome] = st.number_input(
+            f"Aves alojadas - {g_nome}", value=val_atual, step=100
+        )
+
       btn_salvar = st.form_submit_button("Atualizar Informações do Lote")
       if btn_salvar:
         st.session_state.lote_config["sitio"] = sitio_input
         st.session_state.lote_config["lote"] = lote_input
-        st.session_state.lote_config["aves_g1"] = cfg_g1
-        st.session_state.lote_config["aves_g2"] = cfg_g2
-        st.success("Dados do sítio e lote atualizados com sucesso!")
+        st.session_state.lote_config["num_granjas"] = num_granjas_input
+        for g_nome, val in aves_temp.items():
+          st.session_state.lote_config["aves"][g_nome] = val
+        st.success("Dados do sítio, lote e granjas atualizados com sucesso!")
+        st.rerun()
+
+    # Cartão de resumo verde dinâmico
+    resumo_cards_html = ""
+    for g in granjas_ativas:
+      vivas_g = (
+          st.session_state.lote_config["aves"][g]
+          - st.session_state.df_mortalidade[g].sum()
+      )
+      resumo_cards_html += (
+          f"<td><b>{g} (Vivas)</b><br>{vivas_g:,}</td>"
+      )
 
     st.markdown(
         f"""
@@ -249,9 +285,8 @@ else:
             <hr style="margin: 8px 0; border-color: rgba(255,255,255,0.3);">
             <table style="width:100%; color: white; text-align: center;">
                 <tr>
-                    <td><b>Granja 1 (Vivas)</b><br>{saldo_g1:,}</td>
-                    <td><b>Granja 2 (Vivas)</b><br>{saldo_g2:,}</td>
-                    <td><b>Total Lote</b><br>{saldo_total_aves:,}</td>
+                    {resumo_cards_html}
+                    <td><b>Total Lote</b><br>{saldo_geral_vivas:,}</td>
                 </tr>
             </table>
         </div>
@@ -283,13 +318,13 @@ else:
               "Sítio": st.session_state.lote_config["sitio"],
               "Lote": st.session_state.lote_config["lote"],
               "Início": st.session_state.lote_config["inicio"],
-              "Aves Alojadas": total_aloj_g1 + total_aloj_g2,
+              "Aves Alojadas": total_aloj_geral,
               "Conversão Final": 1.490,
           }
           st.session_state.historico_lotes.append(novo_historico)
           st.session_state.lote_config["lote"] = "Novo Lote - NÚCLEO 1"
-          st.session_state.df_mortalidade["Granja 1"] = 0
-          st.session_state.df_mortalidade["Granja 2"] = 0
+          for i in range(1, 11):
+            st.session_state.df_mortalidade[f"Granja {i}"] = 0
           st.session_state.confirmar_finalizacao = False
           st.success("Lote finalizado e arquivado com sucesso!")
           st.rerun()
@@ -301,22 +336,32 @@ else:
   # ==================== 2. MORTALIDADE ====================
   elif menu == "📉 Mortalidade":
     st.subheader("Controle Diário de Mortalidade (45 Dias)")
+
+    mortes_topo_html = ""
+    for g in granjas_ativas:
+      vivas_g = (
+          st.session_state.lote_config["aves"][g]
+          - st.session_state.df_mortalidade[g].sum()
+      )
+      mortes_topo_html += f"<td><b>{g}:</b><br>{vivas_g:,} aves (Mortes: {st.session_state.df_mortalidade[g].sum()})</td>"
+
     st.markdown(
         f"""
         <div style="background: linear-gradient(135deg, #2b8a3e 0%, #2f9e44 100%); padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
             <h5 style="margin:0; text-align:center;">📊 Aves Vivas Atuais ({st.session_state.lote_config['sitio']})</h5>
             <table style="width:100%; color: white; text-align: center; margin-top: 8px;">
                 <tr>
-                    <td><b>Granja 1:</b><br>{saldo_g1:,} aves (Mortes: {mortes_g1_total})</td>
-                    <td><b>Granja 2:</b><br>{saldo_g2:,} aves (Mortes: {mortes_g2_total})</td>
+                    {mortes_topo_html}
                 </tr>
             </table>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    colunas_mostrar_mort = ["Dia"] + granjas_ativas
     st.session_state.df_mortalidade = st.data_editor(
-        st.session_state.df_mortalidade,
+        st.session_state.df_mortalidade[colunas_mostrar_mort],
         num_rows="fixed",
         use_container_width=True,
         key="editor_mortalidade",
@@ -325,35 +370,32 @@ else:
   # ==================== 3. RAÇÃO & ESTOQUE ====================
   elif menu == "🚚 Ração & Estoque":
     st.subheader("Gestão de Cargas de Ração e Estoque no Silo")
+
     with st.expander(
-        "📦 Atualizar Estoque Atual no Silo (Restante)", expanded=True
+        "📦 Atualizar Estoque Atual nos Silos (Restante)", expanded=True
     ):
-      col_s1, col_s2 = st.columns(2)
-      with col_s1:
-        st.session_state.lote_config["estoque_silo_g1"] = st.number_input(
-            "Sobra no Silo - Granja 1 (Kg)",
-            value=float(st.session_state.lote_config["estoque_silo_g1"]),
-            step=50.0,
-        )
-      with col_s2:
-        st.session_state.lote_config["estoque_silo_g2"] = st.number_input(
-            "Sobra no Silo - Granja 2 (Kg)",
-            value=float(st.session_state.lote_config["estoque_silo_g2"]),
+      for g in granjas_ativas:
+        st.session_state.lote_config["estoque_silo"][g] = st.number_input(
+            f"Sobra no Silo - {g} (Kg)",
+            value=float(
+                st.session_state.lote_config["estoque_silo"].get(g, 0.0)
+            ),
             step=50.0,
         )
 
-    estoque_atual_total = (
-        st.session_state.lote_config["estoque_silo_g1"]
-        + st.session_state.lote_config["estoque_silo_g2"]
-    )
-    racao_utilizada_total = max(0.0, racao_chegada_total - estoque_atual_total)
     st.info(
-        f"🚚 **Resumo:** Chegado: **{racao_chegada_total:,.1f} kg** | Silo:"
-        f" **{estoque_atual_total:,.1f} kg** | Utilizada:"
-        f" **{racao_utilizada_total:,.1f} kg**"
+        f"🚚 **Resumo Geral:** Chegado: **{racao_chegada_geral:,.1f} kg** | Silo:"
+        f" **{estoque_silo_geral:,.1f} kg** | Utilizada:"
+        f" **{racao_utilizada_geral:,.1f} kg**"
+    )
+
+    colunas_mostrar_racao = (
+        ["Nº Caminhão / Nota", "Data"]
+        + [f"{g} (Kg)" for g in granjas_ativas]
+        + ["Fórmula / Tipo"]
     )
     st.session_state.df_racao = st.data_editor(
-        st.session_state.df_racao,
+        st.session_state.df_racao[colunas_mostrar_racao],
         num_rows="fixed",
         use_container_width=True,
         key="editor_racao",
@@ -362,8 +404,11 @@ else:
   # ==================== 4. BALANÇA ====================
   elif menu == "⚖️ Balança":
     st.subheader("Pesagens Semanais (De 7 em 7 Dias)")
+    colunas_mostrar_bal = ["Semana / Idade"] + [
+        f"{g} (Peso g)" for g in granjas_ativas
+    ]
     st.session_state.df_balanca = st.data_editor(
-        st.session_state.df_balanca,
+        st.session_state.df_balanca[colunas_mostrar_bal],
         num_rows="fixed",
         use_container_width=True,
         key="editor_balanca",
@@ -372,25 +417,28 @@ else:
   # ==================== 5. CONVERSÃO ====================
   elif menu == "🧮 Conversão":
     st.subheader("Análise de Conversão Alimentar Interligada por Ciclos")
-    estoque_atual_total = (
-        st.session_state.lote_config["estoque_silo_g1"]
-        + st.session_state.lote_config["estoque_silo_g2"]
-    )
-    racao_utilizada_total = max(0.0, racao_chegada_total - estoque_atual_total)
 
     semanas_analise = []
     dias_limite = [7, 14, 21, 28, 35, 42]
-    for i, d in enumerate(dias_limite):
-      mortes_g1 = st.session_state.df_mortalidade["Granja 1"].head(d).sum()
-      mortes_g2 = st.session_state.df_mortalidade["Granja 2"].head(d).sum()
-      vivas_d = (total_aloj_g1 - mortes_g1) + (total_aloj_g2 - mortes_g2)
 
-      p_g1 = st.session_state.df_balanca.loc[i, "Granja 1 (Peso g)"]
-      p_g2 = st.session_state.df_balanca.loc[i, "Granja 2 (Peso g)"]
-      peso_medio = (p_g1 + p_g2) / 2.0 if (p_g1 > 0 or p_g2 > 0) else 0.0
+    for i, d in enumerate(dias_limite):
+      vivas_d = 0
+      for g in granjas_ativas:
+        aloj_g = st.session_state.lote_config["aves"][g]
+        mortes_g = st.session_state.df_mortalidade[g].head(d).sum()
+        vivas_d += aloj_g - mortes_g
+
+      pesos_semana = []
+      for g in granjas_ativas:
+        p_val = st.session_state.df_balanca.loc[i, f"{g} (Peso g)"]
+        if p_val > 0:
+          pesos_semana.append(p_val)
+      peso_medio = (
+          sum(pesos_semana) / len(pesos_semana) if pesos_semana else 0.0
+      )
 
       fator = min(1.0, (i + 1) / 6.0)
-      racao_acum = max(0.0, racao_utilizada_total * fator)
+      racao_acum = max(0.0, racao_utilizada_geral * fator)
       biomassa = (vivas_d * peso_medio) / 1000.0
       ca = (racao_acum / biomassa) if biomassa > 0 else 0.0
 
