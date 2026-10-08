@@ -5,9 +5,51 @@ import streamlit as st
 
 st.set_page_config(page_title="Gestão da Granja Profissional", layout="wide")
 
+# ==================== ESTILIZAÇÃO CSS (FUNDO COM IMAGEM E PALETA ACINZENTADA) ====================
+FUNDO_URL = "https://images.unsplash.com/photo-1516467508483-a7212febe31a?q=80&w=1000&auto=format&fit=crop"  # Substitua se preferir o link direto da imagem dos pintinhos no seu GitHub/HuggingFace
+
+st.markdown(
+    f"""
+    <style>
+    /* Fundo geral da aplicação com imagem semi-transparente e paleta acinzentada */
+    .stApp {{
+        background: linear-gradient(rgba(255, 255, 255, 0.90), rgba(240, 242, 245, 0.92)), url("{FUNDO_URL}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+
+    @media (prefers-color-scheme: dark) {{
+        .stApp {{
+            background: linear-gradient(rgba(15, 17, 21, 0.92), rgba(22, 27, 34, 0.95)), url("{FUNDO_URL}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+    }}
+
+    /* Substituição do Azul por Tons Acinzentados, Preto (Dark) e Branco (Light) */
+    div[data-baseweb="tab-highlight"] {{
+        background-color: #495057 !important;
+    }}
+    
+    /* Cartões e caixas com design neutro e elegante */
+    .custom-card {{
+        background-color: rgba(255, 255, 255, 0.85);
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #ced4da;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ==================== PERSISTÊNCIA (JSON) ====================
 ARQUIVO_USUARIOS = "usuarios.json"
 ARQUIVO_DADOS = "dados_granja.json"
+ARQUIVO_SESSAO = "sessao_ativa.json"
 
 
 def carregar_utilizadores():
@@ -21,7 +63,6 @@ def carregar_utilizadores():
         return dados
     except:
       pass
-  # Conta padrão inicial se o arquivo não existir
   padrao = {
       "Canalthahodoy@gmail.com": {
           "senha": "123",
@@ -45,6 +86,29 @@ def salvar_utilizador(email, senha, nome, sitio, perfil):
   }
   with open(ARQUIVO_USUARIOS, "w", encoding="utf-8") as f:
     json.dump(usuarios, f, ensure_ascii=False, indent=4)
+
+
+def carregar_sessao_salva():
+  if os.path.exists(ARQUIVO_SESSAO):
+    try:
+      with open(ARQUIVO_SESSAO, "r", encoding="utf-8") as f:
+        return json.load(f)
+    except:
+      pass
+  return None
+
+
+def guardar_sessao_ativa(dados_utilizador):
+  with open(ARQUIVO_SESSAO, "w", encoding="utf-8") as f:
+    json.dump(dados_utilizador, f, ensure_ascii=False, indent=4)
+
+
+def limpar_sessao_ativa():
+  if os.path.exists(ARQUIVO_SESSAO):
+    try:
+      os.remove(ARQUIVO_SESSAO)
+    except:
+      pass
 
 
 def carregar_dados_granja():
@@ -72,9 +136,14 @@ def guardar_dados_granja():
     json.dump(dados_para_salvar, f, ensure_ascii=False, indent=4)
 
 
-# 1. ESTADO DE AUTENTICAÇÃO E SESSÃO
+# 1. ESTADO DE AUTENTICAÇÃO E SESSÃO PERSISTENTE
 if "autenticado" not in st.session_state:
-  st.session_state.autenticado = False
+  sessao_previa = carregar_sessao_salva()
+  if sessao_previa:
+    st.session_state.autenticado = True
+    st.session_state.utilizador_atual = sessao_previa
+  else:
+    st.session_state.autenticado = False
 
 if "utilizador_atual" not in st.session_state:
   st.session_state.utilizador_atual = {}
@@ -200,11 +269,11 @@ if "anotacoes_financeiras" not in st.session_state:
     }
 
 
-# ==================== TELA DE LOGIN / CADASTRO (DESIGN ISOLADO) ====================
+# ==================== TELA DE LOGIN / CADASTRO (DESIGN ISOLADO ACINZENTADO) ====================
 if not st.session_state.autenticado:
   st.markdown(
       """
-        <div style="background: linear-gradient(135deg, #2b8a3e 0%, #1864ab 100%); padding: 30px; border-radius: 12px; color: white; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="background: linear-gradient(135deg, #343a40 0%, #212529 100%); padding: 30px; border-radius: 12px; color: white; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
             <h2 style="margin:0; font-size: 28px;">🐔 Sistema de Gestão Avícola Profissional</h2>
             <p style="margin:8px 0 0 0; font-size: 15px; opacity: 0.9;">Plataforma de controlo operacional e financeiro de lotes</p>
         </div>
@@ -212,7 +281,6 @@ if not st.session_state.autenticado:
       unsafe_allow_html=True,
   )
 
-  # Centralizando o bloco de login com colunas
   _, col_centro, _ = st.columns([1, 2.2, 1])
 
   with col_centro:
@@ -230,12 +298,14 @@ if not st.session_state.autenticado:
           if base_usuarios[email_login]["senha"] == senha_login:
             st.session_state.autenticado = True
             dados_user = base_usuarios[email_login]
-            st.session_state.utilizador_atual = {
+            info_utilizador = {
                 "email": email_login,
                 "nome": dados_user["nome"],
                 "sitio": dados_user["sitio"],
                 "perfil": dados_user.get("perfil", "Patrão / Dono"),
             }
+            st.session_state.utilizador_atual = info_utilizador
+            guardar_sessao_ativa(info_utilizador)
             st.session_state.lote_config["sitio"] = dados_user["sitio"]
             st.success("Login efetuado com sucesso!")
             st.rerun()
@@ -278,12 +348,14 @@ if not st.session_state.autenticado:
               email_cad, senha_cad, nome_cad, sitio_cad, perfil_cad
           )
           st.session_state.autenticado = True
-          st.session_state.utilizador_atual = {
+          info_utilizador = {
               "email": email_cad,
               "nome": nome_cad,
               "sitio": sitio_cad,
               "perfil": perfil_cad,
           }
+          st.session_state.utilizador_atual = info_utilizador
+          guardar_sessao_ativa(info_utilizador)
           st.session_state.lote_config["sitio"] = sitio_cad
           guardar_dados_granja()
           st.success("Conta criada com sucesso! A entrar...")
@@ -299,7 +371,7 @@ else:
   with col_cab1:
     st.markdown(
         f"""
-        <div style="background-color: #3b5bdb; padding: 12px; border-radius: 8px; color: white;">
+        <div style="background-color: #343a40; padding: 12px; border-radius: 8px; color: white;">
             <h4 style="margin:0;">📦 Sítio: {st.session_state.lote_config['sitio']} | Lote: {st.session_state.lote_config['lote']}</h4>
             <p style="margin:0; font-size: 12px;">Granjeiro(a): {st.session_state.utilizador_atual.get('nome', 'Utilizador')} &nbsp;|&nbsp; <b>Perfil: {perfil_atual}</b></p>
         </div>
@@ -309,6 +381,7 @@ else:
   with col_cab2:
     if st.button("🚪 Sair", type="secondary"):
       st.session_state.autenticado = False
+      limpar_sessao_ativa()
       st.rerun()
 
   st.write("")
@@ -413,7 +486,7 @@ else:
 
     st.markdown(
         f"""
-        <div style="background: linear-gradient(135deg, #2b8a3e 0%, #2f9e44 100%); padding: 15px; border-radius: 10px; color: white;">
+        <div style="background: linear-gradient(135deg, #495057 0%, #343a40 100%); padding: 15px; border-radius: 10px; color: white;">
             <h4 style="margin:0;">🏡 Sítio: {st.session_state.lote_config['sitio']} | Lote: {st.session_state.lote_config['lote']}</h4>
             <hr style="margin: 8px 0; border-color: rgba(255,255,255,0.3);">
             <table style="width:100%; color: white; text-align: center;">
@@ -486,7 +559,7 @@ else:
 
     st.markdown(
         f"""
-        <div style="background: linear-gradient(135deg, #2b8a3e 0%, #2f9e44 100%); padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
+        <div style="background: linear-gradient(135deg, #495057 0%, #343a40 100%); padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
             <h5 style="margin:0; text-align:center;">📊 Aves Vivas Atuais ({st.session_state.lote_config['sitio']})</h5>
             <table style="width:100%; color: white; text-align: center; margin-top: 8px;">
                 <tr>
