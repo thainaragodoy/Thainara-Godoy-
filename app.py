@@ -11,7 +11,6 @@ if "utilizador_atual" not in st.session_state:
   st.session_state.utilizador_atual = {}
 
 if "base_dados_utilizadores" not in st.session_state:
-  # Utilizador de teste inicial
   st.session_state.base_dados_utilizadores = {
       "admin@granja.com": {
           "senha": "123",
@@ -115,15 +114,13 @@ if not st.session_state.autenticado:
             == senha_login
         ):
           st.session_state.autenticado = True
+          dados_user = st.session_state.base_dados_utilizadores[email_login]
           st.session_state.utilizador_atual = {
               "email": email_login,
-              "nome": st.session_state.base_dados_utilizadores[email_login][
-                  "nome"
-              ],
-              "sitio": st.session_state.base_dados_utilizadores[email_login][
-                  "sitio"
-              ],
+              "nome": dados_user["nome"],
+              "sitio": dados_user["sitio"],
           }
+          st.session_state.lote_config["sitio"] = dados_user["sitio"]
           st.success("Login efetuado com sucesso!")
           st.rerun()
         else:
@@ -133,29 +130,39 @@ if not st.session_state.autenticado:
 
   with tab_cadastro:
     st.subheader("Registo de Novo Granjeiro / Sítio")
-    nome_cad = st.text_input("Nome do Granjeiro")
-    sitio_cad = st.text_input("Nome do Sítio")
-    idade_cad = st.number_input("Idade", min_value=1, max_value=120, value=25)
-    email_cad = st.text_input("E-mail", key="cad_email")
-    senha_cad = st.text_input("Senha", type="password", key="cad_senha")
+    nome_cad = st.text_input("Nome do Granjeiro", key="reg_nome")
+    sitio_cad = st.text_input("Nome do Sítio", key="reg_sitio")
+    idade_cad = st.number_input(
+        "Idade", min_value=1, max_value=120, value=25, key="reg_idade"
+    )
+    email_cad = st.text_input("E-mail", key="reg_email")
+    senha_cad = st.text_input("Senha", type="password", key="reg_senha")
 
-    if st.button("Registar Conta", type="primary"):
+    if st.button("Registar e Entrar", type="primary"):
       if idade_cad < 18:
         st.error("Tem de ser maior de idade (18 anos) para registar uma conta.")
       elif not nome_cad or not sitio_cad or not email_cad or not senha_cad:
         st.warning("Por favor, preencha todos os campos obrigatórios.")
       elif email_cad in st.session_state.base_dados_utilizadores:
-        st.error("Este e-mail já está registado.")
+        st.error(
+            "Este e-mail já está registado. Utilize a aba 'Entrar' para aceder."
+        )
       else:
+        # Gravar na base de dados e autenticar automaticamente
         st.session_state.base_dados_utilizadores[email_cad] = {
             "senha": senha_cad,
             "nome": nome_cad,
             "sitio": sitio_cad,
         }
+        st.session_state.autenticado = True
+        st.session_state.utilizador_atual = {
+            "email": email_cad,
+            "nome": nome_cad,
+            "sitio": sitio_cad,
+        }
         st.session_state.lote_config["sitio"] = sitio_cad
-        st.success(
-            "Conta criada com sucesso! Pode agora mudar para o separador 'Entrar'."
-        )
+        st.success("Conta criada com sucesso! A entrar na aplicação...")
+        st.rerun()
 
 # ==================== APLICAÇÃO PRINCIPAL (PÓS-LOGIN) ====================
 else:
