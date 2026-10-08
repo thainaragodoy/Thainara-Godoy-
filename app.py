@@ -62,6 +62,7 @@ def guardar_dados_granja():
       "df_balanca": st.session_state.df_balanca.to_dict(),
       "df_medicacao": st.session_state.df_medicacao.to_dict(),
       "lembretes_manutencao": st.session_state.lembretes_manutencao,
+      "anotacoes_financeiras": st.session_state.anotacoes_financeiras,
   }
   with open(ARQUIVO_DADOS, "w", encoding="utf-8") as f:
     json.dump(dados_para_salvar, f, ensure_ascii=False, indent=4)
@@ -178,6 +179,21 @@ if "lembretes_manutencao" not in st.session_state:
         "- Verificar bicos de nipple das granjas.\n- Agendar manutenção do"
         " gerador."
     )
+
+if "anotacoes_financeiras" not in st.session_state:
+  if dados_salvos and "anotacoes_financeiras" in dados_salvos:
+    st.session_state.anotacoes_financeiras = dados_salvos[
+        "anotacoes_financeiras"
+    ]
+  else:
+    st.session_state.anotacoes_financeiras = {
+        "sitio": "Sítio Boa Vista",
+        "qtd_alojada": 124000,
+        "qtd_abatidas": 120000,
+        "conversao_lote": 1.520,
+        "pagamento_ave": 1.95,
+        "valor_final": 234000.0,
+    }
 
 
 # ==================== TELA DE LOGIN / CADASTRO ====================
@@ -594,6 +610,7 @@ else:
   # ==================== 6. OBSERVAÇÕES ====================
   elif menu == "📝 Observações":
     st.subheader("Área de Observações e Lembretes")
+
     st.markdown("### 💊 Fase 1: Controle de Medicações e Aplicações (45 Dias)")
     df_med_editado = st.data_editor(
         st.session_state.df_medicacao,
@@ -617,6 +634,71 @@ else:
       st.session_state.lembretes_manutencao = novo_lembrete
       guardar_dados_granja()
       st.success("Lembretes atualizados com sucesso!")
+
+    st.write("")
+    st.markdown("---")
+    st.markdown("### 💰 Fase 3: Anotações Financeiras e Resumo do Lote")
+
+    with st.form("form_anotacoes_financeiras"):
+      f_sitio = st.text_input(
+          "Sítio", value=st.session_state.anotacoes_financeiras["sitio"]
+      )
+      col_fin1, col_fin2 = st.columns(2)
+      with col_fin1:
+        f_alojada = st.number_input(
+            "Quantidade alojada",
+            value=int(
+                st.session_state.anotacoes_financeiras["qtd_alojada"]
+            ),
+            step=100,
+        )
+        f_abatidas = st.number_input(
+            "Quantidade abatidas",
+            value=int(
+                st.session_state.anotacoes_financeiras["qtd_abatidas"]
+            ),
+            step=100,
+        )
+        f_conversao = st.number_input(
+            "Conversão do lote",
+            value=float(
+                st.session_state.anotacoes_financeiras["conversao_lote"]
+            ),
+            format="%.3f",
+            step=0.005,
+        )
+      with col_fin2:
+        f_pagamento = st.number_input(
+            "Pagamento por ave (R$)",
+            value=float(
+                st.session_state.anotacoes_financeiras["pagamento_ave"]
+            ),
+            format="%.2f",
+            step=0.01,
+        )
+        f_valor_final = st.number_input(
+            "Valor final recebido (R$)",
+            value=float(
+                st.session_state.anotacoes_financeiras["valor_final"]
+            ),
+            format="%.2f",
+            step=100.0,
+        )
+
+      btn_salvar_fin = st.form_submit_button(
+          "Guardar Anotações Financeiras"
+      )
+      if btn_salvar_fin:
+        st.session_state.anotacoes_financeiras = {
+            "sitio": f_sitio,
+            "qtd_alojada": f_alojada,
+            "qtd_abatidas": f_abatidas,
+            "conversao_lote": f_conversao,
+            "pagamento_ave": f_pagamento,
+            "valor_final": f_valor_final,
+        }
+        guardar_dados_granja()
+        st.success("Anotações financeiras guardadas com sucesso!")
 
   # ==================== 7. FECHAMENTO & ACERTO (EXCLUSIVO PATRÃO) ====================
   elif menu == "💰 Fechamento & Acerto" and perfil_atual == "Patrão / Dono":
