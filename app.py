@@ -21,14 +21,18 @@ def carregar_utilizadores():
         return dados
     except:
       pass
-  return {
-      "admin@granja.com": {
+  # Conta padrão inicial se o arquivo não existir
+  padrao = {
+      "Canalthahodoy@gmail.com": {
           "senha": "123",
-          "nome": "João Granjeiro",
+          "nome": "Thainara",
           "sitio": "Sítio Boa Vista",
           "perfil": "Patrão / Dono",
       }
   }
+  with open(ARQUIVO_USUARIOS, "w", encoding="utf-8") as f:
+    json.dump(padrao, f, ensure_ascii=False, indent=4)
+  return padrao
 
 
 def salvar_utilizador(email, senha, nome, sitio, perfil):
@@ -196,83 +200,94 @@ if "anotacoes_financeiras" not in st.session_state:
     }
 
 
-# ==================== TELA DE LOGIN / CADASTRO ====================
+# ==================== TELA DE LOGIN / CADASTRO (DESIGN ISOLADO) ====================
 if not st.session_state.autenticado:
   st.markdown(
       """
-        <div style="background-color: #3b5bdb; padding: 15px; border-radius: 8px; color: white; text-align: center; margin-bottom: 20px;">
-            <h3 style="margin:0;">🐔 Sistema de Gestão Avícola Profissional</h3>
-            <p style="margin:0; font-size: 14px;">Faça login ou crie a sua conta para aceder à granja</p>
+        <div style="background: linear-gradient(135deg, #2b8a3e 0%, #1864ab 100%); padding: 30px; border-radius: 12px; color: white; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            <h2 style="margin:0; font-size: 28px;">🐔 Sistema de Gestão Avícola Profissional</h2>
+            <p style="margin:8px 0 0 0; font-size: 15px; opacity: 0.9;">Plataforma de controlo operacional e financeiro de lotes</p>
         </div>
         """,
       unsafe_allow_html=True,
   )
 
-  tab_login, tab_cadastro = st.tabs(["🔐 Entrar", "📝 Criar Conta / Registo"])
+  # Centralizando o bloco de login com colunas
+  _, col_centro, _ = st.columns([1, 2.2, 1])
 
-  with tab_login:
-    st.subheader("Aceder à Aplicação")
-    email_login = st.text_input("E-mail", key="login_email")
-    senha_login = st.text_input("Senha", type="password", key="login_senha")
+  with col_centro:
+    tab_login, tab_cadastro = st.tabs(["🔐 Entrar na Conta", "📝 Criar Registo"])
 
-    if st.button("Entrar", type="primary"):
-      base_usuarios = carregar_utilizadores()
-      if email_login in base_usuarios:
-        if base_usuarios[email_login]["senha"] == senha_login:
-          st.session_state.autenticado = True
-          dados_user = base_usuarios[email_login]
-          st.session_state.utilizador_atual = {
-              "email": email_login,
-              "nome": dados_user["nome"],
-              "sitio": dados_user["sitio"],
-              "perfil": dados_user.get("perfil", "Patrão / Dono"),
-          }
-          st.session_state.lote_config["sitio"] = dados_user["sitio"]
-          st.success("Login efetuado com sucesso!")
-          st.rerun()
+    with tab_login:
+      st.write("")
+      email_login = st.text_input("E-mail", key="login_email")
+      senha_login = st.text_input("Senha", type="password", key="login_senha")
+      st.write("")
+
+      if st.button("Entrar no Sistema", type="primary", use_container_width=True):
+        base_usuarios = carregar_utilizadores()
+        if email_login in base_usuarios:
+          if base_usuarios[email_login]["senha"] == senha_login:
+            st.session_state.autenticado = True
+            dados_user = base_usuarios[email_login]
+            st.session_state.utilizador_atual = {
+                "email": email_login,
+                "nome": dados_user["nome"],
+                "sitio": dados_user["sitio"],
+                "perfil": dados_user.get("perfil", "Patrão / Dono"),
+            }
+            st.session_state.lote_config["sitio"] = dados_user["sitio"]
+            st.success("Login efetuado com sucesso!")
+            st.rerun()
+          else:
+            st.error("Senha incorreta.")
         else:
-          st.error("Senha incorreta.")
-      else:
-        st.error("E-mail não registado.")
+          st.error(
+              "E-mail não registado. Verifique o e-mail ou crie uma conta na"
+              " aba ao lado."
+          )
 
-  with tab_cadastro:
-    st.subheader("Registo de Novo Granjeiro / Sítio")
-    nome_cad = st.text_input("Nome do Granjeiro", key="reg_nome")
-    sitio_cad = st.text_input("Nome do Sítio", key="reg_sitio")
-    idade_cad = st.number_input(
-        "Idade", min_value=1, max_value=120, value=25, key="reg_idade"
-    )
-    perfil_cad = st.selectbox(
-        "Perfil de Acesso", ["Patrão / Dono", "Funcionário / Granjeiro"]
-    )
-    email_cad = st.text_input("E-mail", key="reg_email")
-    senha_cad = st.text_input("Senha", type="password", key="reg_senha")
+    with tab_cadastro:
+      st.write("")
+      nome_cad = st.text_input("Nome do Granjeiro", key="reg_nome")
+      sitio_cad = st.text_input("Nome do Sítio", key="reg_sitio")
+      idade_cad = st.number_input(
+          "Idade", min_value=1, max_value=120, value=25, key="reg_idade"
+      )
+      perfil_cad = st.selectbox(
+          "Perfil de Acesso", ["Patrão / Dono", "Funcionário / Granjeiro"]
+      )
+      email_cad = st.text_input("E-mail", key="reg_email")
+      senha_cad = st.text_input("Senha", type="password", key="reg_senha")
+      st.write("")
 
-    if st.button("Registar e Entrar", type="primary"):
-      base_usuarios = carregar_utilizadores()
-      if idade_cad < 18:
-        st.error("Tem de ser maior de idade (18 anos) para registar uma conta.")
-      elif not nome_cad or not sitio_cad or not email_cad or not senha_cad:
-        st.warning("Por favor, preencha todos os campos obrigatórios.")
-      elif email_cad in base_usuarios:
-        st.error(
-            "Este e-mail já está registado. Utilize a aba 'Entrar' para aceder."
-        )
-      else:
-        salvar_utilizador(
-            email_cad, senha_cad, nome_cad, sitio_cad, perfil_cad
-        )
-        st.session_state.autenticado = True
-        st.session_state.utilizador_atual = {
-            "email": email_cad,
-            "nome": nome_cad,
-            "sitio": sitio_cad,
-            "perfil": perfil_cad,
-        }
-        st.session_state.lote_config["sitio"] = sitio_cad
-        guardar_dados_granja()
-        st.success("Conta criada com sucesso! A entrar na aplicação...")
-        st.rerun()
+      if st.button(
+          "Registar e Aceder", type="primary", use_container_width=True
+      ):
+        base_usuarios = carregar_utilizadores()
+        if idade_cad < 18:
+          st.error(
+              "Tem de ser maior de idade (18 anos) para registar uma conta."
+          )
+        elif not nome_cad or not sitio_cad or not email_cad or not senha_cad:
+          st.warning("Por favor, preencha todos os campos obrigatórios.")
+        elif email_cad in base_usuarios:
+          st.error("Este e-mail já está registado. Utilize a aba 'Entrar'.")
+        else:
+          salvar_utilizador(
+              email_cad, senha_cad, nome_cad, sitio_cad, perfil_cad
+          )
+          st.session_state.autenticado = True
+          st.session_state.utilizador_atual = {
+              "email": email_cad,
+              "nome": nome_cad,
+              "sitio": sitio_cad,
+              "perfil": perfil_cad,
+          }
+          st.session_state.lote_config["sitio"] = sitio_cad
+          guardar_dados_granja()
+          st.success("Conta criada com sucesso! A entrar...")
+          st.rerun()
 
 # ==================== APLICAÇÃO PRINCIPAL (PÓS-LOGIN) ====================
 else:
