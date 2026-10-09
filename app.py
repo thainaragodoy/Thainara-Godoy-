@@ -1,3 +1,18 @@
+import pandas as pd
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Importa o módulo isolado de autenticação que criamos acima
+from auth import carregar_utilizadores, gerenciar_autenticacao, salvar_utilizador
+
+st.set_page_config(
+    page_title="Sistema de Gestão Avícola Profissional", layout="wide"
+)
+
+# Executa o controlo de login persistente
+esta_logado = gerenciar_autenticacao()
+
+# Resto do seu código do app.py continua aqui...
 import json
 import os
 import pandas as pd
