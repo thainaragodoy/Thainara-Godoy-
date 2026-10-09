@@ -12,8 +12,14 @@ def carregar_utilizadores():
       with open(ARQUIVO_USUARIOS, "r", encoding="utf-8") as f:
         dados = json.load(f)
         for email in dados:
+          if not isinstance(dados[email], dict):
+            dados[email] = {}
           if "perfil" not in dados[email]:
             dados[email]["perfil"] = "Patrão / Dono"
+          if "sitio" not in dados[email]:
+            dados[email]["sitio"] = "Sítio Boa Vista"
+          if "nome" not in dados[email]:
+            dados[email]["nome"] = "Granjeiro"
         return dados
     except:
       pass
@@ -62,7 +68,6 @@ def gerenciar_autenticacao():
         """
     components.html(js_auto_login, height=0)
 
-    # Leitura totalmente blindada contra qualquer erro de atributos da URL
     saved_email = None
     try:
       if "user_email" in st.query_params:
@@ -79,8 +84,8 @@ def gerenciar_autenticacao():
         st.session_state.autenticado = True
         st.session_state.utilizador_atual = {
             "email": saved_email,
-            "nome": u_data["nome"],
-            "sitio": u_data["sitio"],
+            "nome": u_data.get("nome", "Thainara"),
+            "sitio": u_data.get("sitio", "Sítio Boa Vista"),
             "perfil": u_data.get("perfil", "Patrão / Dono"),
         }
 
