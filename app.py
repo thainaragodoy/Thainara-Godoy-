@@ -2,10 +2,15 @@ import json
 import os
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Gestão da Granja Profissional", layout="wide")
+st.set_page_config(
+    page_title="Sistema de Gestão Avícola Profissional", layout="wide"
+)
 
-# ==================== ESTILIZAÇÃO CSS ====================
+# =====================================================================
+# 1. MÓDULO DE ESTILO (CSS RESPONSIVO E TEMA CLARO/ESCURO)
+# =====================================================================
 FUNDO_URL = "fundo_pintinhos.png"
 
 st.markdown(
@@ -18,7 +23,6 @@ st.markdown(
         background-attachment: fixed;
         color: #212529 !important;
     }}
-
     @media (prefers-color-scheme: dark) {{
         .stApp {{
             background: linear-gradient(rgba(15, 17, 21, 0.92), rgba(22, 27, 34, 0.95)), url("{FUNDO_URL}");
@@ -28,28 +32,25 @@ st.markdown(
             color: #f8f9fa !important;
         }}
     }}
-
-    p, span, label, h1, h2, h3, h4, h5, h6 {{
-        color: inherit !important;
-    }}
-
-    div[data-baseweb="tab-highlight"] {{
-        background-color: #495057 !important;
-    }}
+    p, span, label, h1, h2, h3, h4, h5, h6 {{ color: inherit !important; }}
+    div[data-baseweb="tab-highlight"] {{ background-color: #495057 !important; }}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ==================== PERSISTÊNCIA (JSON) ====================
-ARQUIVO_USUARIOS = "usuarios.json"
-ARQUIVO_DADOS = "dados_granja.json"
+# =====================================================================
+# 2. MÓDULO DE DADOS & PERSISTÊNCIA (JSON)
+# =====================================================================
+ARQ_USUARIOS = "usuarios.json"
+ARQ_DADOS = "dados_granja.json"
 
 
 def carregar_utilizadores():
-  if os.path.exists(ARQUIVO_USUARIOS):
+  """Carrega ou cria a base de dados de utilizadores e senhas (usuarios.json)"""
+  if os.path.exists(ARQ_USUARIOS):
     try:
-      with open(ARQUIVO_USUARIOS, "r", encoding="utf-8") as f:
+      with open(ARQ_USUARIOS, "r", encoding="utf-8") as f:
         dados = json.load(f)
         for email in dados:
           if "perfil" not in dados[email]:
@@ -65,12 +66,13 @@ def carregar_utilizadores():
           "perfil": "Patrão / Dono",
       }
   }
-  with open(ARQUIVO_USUARIOS, "w", encoding="utf-8") as f:
+  with open(ARQ_USUARIOS, "w", encoding="utf-8") as f:
     json.dump(padrao, f, ensure_ascii=False, indent=4)
   return padrao
 
 
 def salvar_utilizador(email, senha, nome, sitio, perfil):
+  """Salva um novo utilizador registado no usuarios.json"""
   usuarios = carregar_utilizadores()
   usuarios[email] = {
       "senha": senha,
@@ -78,21 +80,23 @@ def salvar_utilizador(email, senha, nome, sitio, perfil):
       "sitio": sitio,
       "perfil": perfil,
   }
-  with open(ARQUIVO_USUARIOS, "w", encoding="utf-8") as f:
+  with open(ARQ_USUARIOS, "w", encoding="utf-8") as f:
     json.dump(usuarios, f, ensure_ascii=False, indent=4)
 
 
-def carregar_dados_granja():
-  if os.path.exists(ARQUIVO_DADOS):
+def carregar_dados_operacionais():
+  """Gere exclusivamente as informações operacionais da granja (dados_granja.json)"""
+  if os.path.exists(ARQ_DADOS):
     try:
-      with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
+      with open(ARQ_DADOS, "r", encoding="utf-8") as f:
         return json.load(f)
     except:
       pass
   return None
 
 
-def guardar_dados_granja():
+def guardar_dados_operacionais():
+  """Salva o estado atual da granja no ficheiro JSON"""
   dados_para_salvar = {
       "lote_config": st.session_state.lote_config,
       "historico_lotes": st.session_state.historico_lotes,
@@ -103,283 +107,287 @@ def guardar_dados_granja():
       "lembretes_manutencao": st.session_state.lembretes_manutencao,
       "anotacoes_financeiras": st.session_state.anotacoes_financeiras,
   }
-  with open(ARQUIVO_DADOS, "w", encoding="utf-8") as f:
+  with open(ARQ_DADOS, "w", encoding="utf-8") as f:
     json.dump(dados_para_salvar, f, ensure_ascii=False, indent=4)
 
 
-# ==================== CONTROLE DE SESSÃO INTELIGENTE (COM LEMBRAR NESTE NAVEGADOR) ====================
+# =====================================================================
+# 3. MÓDULO DE SESSÃO & CONTROLO DE LOGIN (PERSISTENTE VIA LOCALSTORAGE)
+# =====================================================================
 if "autenticado" not in st.session_state:
-  # Verifica se existe um login salvo na memória do navegador deste aparelho específico
-  params = st.query_params
-  saved_email = params.get("user_email", None)
-
-  if saved_email:
-    base_usuarios = carregar_utilizadores()
-    if saved_email in base_usuarios:
-      dados_user = base_usuarios[saved_email]
-      st.session_state.autenticado = True
-      st.session_state.utilizador_atual = {
-          "email": saved_email,
-          "nome": dados_user["nome"],
-          "sitio": dados_user["sitio"],
-          "perfil": dados_user.get("perfil", "Patrão / Dono"),
-      }
-    else:
-      st.session_state.autenticado = False
-  else:
-    st.session_state.autenticado = False
+  st.session_state.autenticado = False
 
 if "utilizador_atual" not in st.session_state:
   st.session_state.utilizador_atual = {}
 
-dados_salvos = carregar_dados_granja()
+# Script JS para recuperar a sessão anterior do navegador sem pedir senha de novo
+if not st.session_state.autenticado:
+  js_verificar_sessao = """
+    <script>
+    const savedEmail = localStorage.getItem('granja_user_email');
+    if (savedEmail && !window.location.search.includes('user_email=')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('user_email', savedEmail);
+        window.location.search = urlParams.toString();
+    }
+    </script>
+    """
+  components.html(js_verificar_sessao, height=0)
+
+  params = st.query_params
+  saved_email = params.get("user_email", None)
+  if saved_email and not st.session_state.autenticado:
+    base_u = carregar_utilizadores()
+    if saved_email in base_u:
+      u_data = base_u[saved_email]
+      st.session_state.autenticado = True
+      st.session_state.utilizador_atual = {
+          "email": saved_email,
+          "nome": u_data["nome"],
+          "sitio": u_data["sitio"],
+          "perfil": u_data.get("perfil", "Patrão / Dono"),
+      }
+      st.rerun()
+
+# =====================================================================
+# 4. INICIALIZAÇÃO DOS DADOS DO APLICATIVO
+# =====================================================================
+dados_salvos = carregar_dados_operacionais()
 
 aves_iniciais = {f"Granja {i}": (62000 if i <= 2 else 0) for i in range(1, 11)}
-silos_iniciais = {f"Granja {i}": 0.0 for i in range(1, 11)}
 
 if "lote_config" not in st.session_state:
-  if dados_salvos and "lote_config" in dados_salvos:
-    st.session_state.lote_config = dados_salvos["lote_config"]
-  else:
-    st.session_state.lote_config = {
-        "sitio": "Sítio Boa Vista",
-        "lote": "Lote 01 - NÚCLEO 1",
-        "inicio": "23/08/2026",
-        "num_granjas": 2,
-        "aves": aves_iniciais,
-        "estoque_silo": silos_iniciais,
-    }
+  st.session_state.lote_config = (
+      dados_salvos.get("lote_config")
+      if dados_salvos
+      else {
+          "sitio": "Sítio Boa Vista",
+          "lote": "Lote 01 - NÚCLEO 1",
+          "inicio": "23/08/2026",
+          "num_granjas": 2,
+          "aves": aves_iniciais,
+          "estoque_silo": {f"Granja {i}": 0.0 for i in range(1, 11)},
+      }
+  )
 
 if "historico_lotes" not in st.session_state:
-  if dados_salvos and "historico_lotes" in dados_salvos:
-    st.session_state.historico_lotes = dados_salvos["historico_lotes"]
-  else:
-    st.session_state.historico_lotes = [
-        {
-            "Lote": "Lote Anterior 01",
-            "Início": "10/06/2026",
-            "Aves Alojadas": 120000,
-            "Total Aves Mortas": 2400,
-            "Ração Consumida (Kg)": 180000.0,
-            "Conversão Final": 1.510,
-            "R$ por Cabeça": 1.92,
-            "Comissão Total (R$)": 230400.0,
-        },
-        {
-            "Lote": "Lote Anterior 02",
-            "Início": "15/07/2026",
-            "Aves Alojadas": 124000,
-            "Total Aves Mortas": 1900,
-            "Ração Consumida (Kg)": 182000.0,
-            "Conversão Final": 1.490,
-            "R$ por Cabeça": 1.98,
-            "Comissão Total (R$)": 245520.0,
-        },
-    ]
+  st.session_state.historico_lotes = (
+      dados_salvos.get("historico_lotes")
+      if dados_salvos
+      else [
+          {
+              "Lote": "Lote Anterior 01",
+              "Início": "10/06/2026",
+              "Aves Alojadas": 120000,
+              "Total Aves Mortas": 2400,
+              "Ração Consumida (Kg)": 180000.0,
+              "Conversão Final": 1.510,
+              "R$ por Cabeça": 1.92,
+              "Comissão Total (R$)": 230400.0,
+          }
+      ]
+  )
 
 if "df_mortalidade" not in st.session_state:
-  if dados_salvos and "df_mortalidade" in dados_salvos:
-    st.session_state.df_mortalidade = pd.DataFrame(
-        dados_salvos["df_mortalidade"]
-    )
-  else:
-    dias = [f"Dia {i}" for i in range(1, 46)]
-    dict_mort = {"Dia": dias}
-    for i in range(1, 11):
-      dict_mort[f"Granja {i}"] = [0] * 45
-    st.session_state.df_mortalidade = pd.DataFrame(dict_mort)
+  st.session_state.df_mortalidade = (
+      pd.DataFrame(dados_salvos["df_mortalidade"])
+      if dados_salvos
+      else pd.DataFrame(
+          {"Dia": [f"Dia {i}" for i in range(1, 46)]}
+          | {f"Granja {i}": [0] * 45 for i in range(1, 11)}
+      )
+  )
 
 if "df_racao" not in st.session_state:
-  if dados_salvos and "df_racao" in dados_salvos:
-    st.session_state.df_racao = pd.DataFrame(dados_salvos["df_racao"])
-  else:
-    dict_rac = {
-        "Nº Caminhão / Nota": [
-            f"Caminhão {i}" if i <= 5 else "" for i in range(1, 41)
-        ],
-        "Data": ["" for _ in range(40)],
-    }
-    for i in range(1, 11):
-      dict_rac[f"Granja {i} (Kg)"] = [0.0 for _ in range(40)]
-    dict_rac["Fórmula / Tipo"] = ["" for _ in range(40)]
-    st.session_state.df_racao = pd.DataFrame(dict_rac)
+  st.session_state.df_racao = (
+      pd.DataFrame(dados_salvos["df_racao"])
+      if dados_salvos
+      else pd.DataFrame(
+          {
+              "Nº Caminhão / Nota": [
+                  f"Caminhão {i}" if i <= 5 else "" for i in range(1, 41)
+              ],
+              "Data": ["" for _ in range(40)],
+          }
+          | {f"Granja {i} (Kg)": [0.0] * 40 for i in range(1, 11)}
+          | {"Fórmula / Tipo": ["" for _ in range(40)]}
+      )
+  )
 
 if "df_balanca" not in st.session_state:
-  if dados_salvos and "df_balanca" in dados_salvos:
-    st.session_state.df_balanca = pd.DataFrame(dados_salvos["df_balanca"])
-  else:
-    dict_bal = {
-        "Semana / Idade": [
-            "1ª Semana (7 dias)",
-            "2ª Semana (14 dias)",
-            "3ª Semana (21 dias)",
-            "4ª Semana (28 dias)",
-            "5ª Semana (35 dias)",
-            "6ª Semana (42 dias)",
-        ]
-    }
-    for i in range(1, 11):
-      dict_bal[f"Granja {i} (Peso g)"] = [0.0] * 6
-    st.session_state.df_balanca = pd.DataFrame(dict_bal)
+  st.session_state.df_balanca = (
+      pd.DataFrame(dados_salvos["df_balanca"])
+      if dados_salvos
+      else pd.DataFrame(
+          {
+              "Semana / Idade": [
+                  "1ª Semana (7 dias)",
+                  "2ª Semana (14 dias)",
+                  "3ª Semana (21 dias)",
+                  "4ª Semana (28 dias)",
+                  "5ª Semana (35 dias)",
+                  "6ª Semana (42 dias)",
+              ]
+          }
+          | {f"Granja {i} (Peso g)": [0.0] * 6 for i in range(1, 11)}
+      )
+  )
 
 if "df_medicacao" not in st.session_state:
-  if dados_salvos and "df_medicacao" in dados_salvos:
-    st.session_state.df_medicacao = pd.DataFrame(dados_salvos["df_medicacao"])
-  else:
-    dias_med = [f"Dia {i}" for i in range(1, 46)]
-    st.session_state.df_medicacao = pd.DataFrame({
-        "Dia": dias_med,
-        "Medicação / Produto": ["" for _ in range(45)],
-        "Dosagem / Quantidade": ["" for _ in range(45)],
-        "Observações Aplicação": ["" for _ in range(45)],
-    })
+  st.session_state.df_medicacao = (
+      pd.DataFrame(dados_salvos["df_medicacao"])
+      if dados_salvos
+      else pd.DataFrame({
+          "Dia": [f"Dia {i}" for i in range(1, 46)],
+          "Medicação / Produto": ["" for _ in range(45)],
+          "Dosagem / Quantidade": ["" for _ in range(45)],
+          "Observações Aplicação": ["" for _ in range(45)],
+      })
+  )
 
 if "lembretes_manutencao" not in st.session_state:
-  if dados_salvos and "lembretes_manutencao" in dados_salvos:
-    st.session_state.lembretes_manutencao = dados_salvos[
-        "lembretes_manutencao"
-    ]
-  else:
-    st.session_state.lembretes_manutencao = (
-        "- Verificar bicos de nipple das granjas.\n- Agendar manutenção do"
-        " gerador."
-    )
+  st.session_state.lembretes_manutencao = (
+      dados_salvos.get("lembretes_manutencao", "- Verificar bicos de nipple.")
+      if dados_salvos
+      else "- Verificar bicos de nipple."
+  )
 
 if "anotacoes_financeiras" not in st.session_state:
-  if dados_salvos and "anotacoes_financeiras" in dados_salvos:
-    st.session_state.anotacoes_financeiras = dados_salvos[
-        "anotacoes_financeiras"
-    ]
-  else:
-    st.session_state.anotacoes_financeiras = {
-        "sitio": "Sítio Boa Vista",
-        "qtd_alojada": 124000,
-        "qtd_abatidas": 120000,
-        "conversao_lote": 1.520,
-        "pagamento_ave": 1.95,
-        "valor_final": 234000.0,
-    }
+  st.session_state.anotacoes_financeiras = (
+      dados_salvos.get("anotacoes_financeiras")
+      if dados_salvos
+      else {
+          "sitio": "Sítio Boa Vista",
+          "qtd_alojada": 124000,
+          "qtd_abatidas": 120000,
+          "conversao_lote": 1.520,
+          "pagamento_ave": 1.95,
+          "valor_final": 234000.0,
+      }
+  )
 
 
-# ==================== TELA DE LOGIN / CADASTRO ====================
+# =====================================================================
+# 5. TELA DE AUTENTICAÇÃO (LOGIN / REGISTO)
+# =====================================================================
 if not st.session_state.autenticado:
   st.markdown(
       """
-        <div style="background: linear-gradient(135deg, #343a40 0%, #212529 100%); padding: 30px; border-radius: 12px; color: white; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-            <h2 style="margin:0; color: white; font-size: 28px;">🐔 Sistema de Gestão Avícola Profissional</h2>
-            <p style="margin:8px 0 0 0; color: #f8f9fa; font-size: 15px; opacity: 0.9;">Plataforma de controlo operacional e financeiro de lotes</p>
+        <div style="background: linear-gradient(135deg, #343a40 0%, #212529 100%); padding: 30px; border-radius: 12px; color: white; text-align: center; margin-bottom: 25px;">
+            <h2 style="margin:0; color: white;">🐔 Sistema de Gestão Avícola Profissional</h2>
+            <p style="margin:8px 0 0 0; color: #f8f9fa;">Plataforma de controlo operacional e financeiro</p>
         </div>
         """,
       unsafe_allow_html=True,
   )
 
   _, col_centro, _ = st.columns([1, 2.2, 1])
-
   with col_centro:
-    tab_login, tab_cadastro = st.tabs(["🔐 Entrar na Conta", "📝 Criar Registo"])
+    aba_login, aba_registo = st.tabs(["🔐 Entrar na Conta", "📝 Criar Registo"])
 
-    with tab_login:
+    with aba_login:
+      email_l = st.text_input("E-mail", key="l_email")
+      senha_l = st.text_input("Senha", type="password", key="l_senha")
       st.write("")
-      email_login = st.text_input("E-mail", key="login_email")
-      senha_login = st.text_input("Senha", type="password", key="login_senha")
-      lembrar_login = st.checkbox(
-          "Lembrar de mim neste dispositivo", value=True
-      )
-      st.write("")
-
       if st.button("Entrar no Sistema", type="primary", use_container_width=True):
-        base_usuarios = carregar_utilizadores()
-        if email_login in base_usuarios:
-          if base_usuarios[email_login]["senha"] == senha_login:
-            st.session_state.autenticado = True
-            dados_user = base_usuarios[email_login]
-            st.session_state.utilizador_atual = {
-                "email": email_login,
-                "nome": dados_user["nome"],
-                "sitio": dados_user["sitio"],
-                "perfil": dados_user.get("perfil", "Patrão / Dono"),
-            }
-            if lembrar_login:
-              st.query_params["user_email"] = email_login
-            st.session_state.lote_config["sitio"] = dados_user["sitio"]
-            st.success("Login efetuado com sucesso!")
-            st.rerun()
-          else:
-            st.error("Senha incorreta.")
+        base_u = carregar_utilizadores()
+        if email_l in base_u and base_u[email_l]["senha"] == senha_l:
+          st.session_state.autenticado = True
+          u_data = base_u[email_l]
+          st.session_state.utilizador_atual = {
+              "email": email_l,
+              "nome": u_data["nome"],
+              "sitio": u_data["sitio"],
+              "perfil": u_data.get("perfil", "Patrão / Dono"),
+          }
+          js_gravar = f"""
+                <script>
+                localStorage.setItem('granja_user_email', '{email_l}');
+                window.location.href = window.location.pathname + '?user_email={email_l}';
+                </script>
+                """
+          components.html(js_gravar, height=0)
+          st.success("Login efetuado com sucesso!")
+          st.rerun()
         else:
-          st.error("E-mail não registado.")
+          st.error("E-mail ou senha incorretos.")
 
-    with tab_cadastro:
-      st.write("")
-      nome_cad = st.text_input("Nome do Granjeiro", key="reg_nome")
-      sitio_cad = st.text_input("Nome do Sítio", key="reg_sitio")
-      idade_cad = st.number_input(
-          "Idade", min_value=1, max_value=120, value=25, key="reg_idade"
-      )
-      perfil_cad = st.selectbox(
+    with aba_registo:
+      nome_c = st.text_input("Nome do Granjeiro", key="r_nome")
+      sitio_c = st.text_input("Nome do Sítio", key="r_sitio")
+      idade_c = st.number_input("Idade", min_value=1, max_value=120, value=25)
+      perfil_c = st.selectbox(
           "Perfil de Acesso", ["Patrão / Dono", "Funcionário / Granjeiro"]
       )
-      email_cad = st.text_input("E-mail", key="reg_email")
-      senha_cad = st.text_input("Senha", type="password", key="reg_senha")
+      email_c = st.text_input("E-mail", key="r_email")
+      senha_c = st.text_input("Senha", type="password", key="r_senha")
       st.write("")
-
       if st.button(
           "Registar e Aceder", type="primary", use_container_width=True
       ):
-        base_usuarios = carregar_utilizadores()
-        if idade_cad < 18:
-          st.error(
-              "Tem de ser maior de idade (18 anos) para registar uma conta."
-          )
-        elif not nome_cad or not sitio_cad or not email_cad or not senha_cad:
-          st.warning("Por favor, preencha todos os campos obrigatórios.")
-        elif email_cad in base_usuarios:
-          st.error("Este e-mail já está registado. Utilize a aba 'Entrar'.")
+        base_u = carregar_utilizadores()
+        if idade_c < 18:
+          st.error("Tem de ser maior de idade para registar.")
+        elif email_c in base_u:
+          st.error("Este e-mail já está registado.")
+        elif not nome_c or not sitio_c or not email_c or not senha_c:
+          st.warning("Preencha todos os campos obrigatórios.")
         else:
-          salvar_utilizador(
-              email_cad, senha_cad, nome_cad, sitio_cad, perfil_cad
-          )
+          salvar_utilizador(email_c, senha_c, nome_c, sitio_c, perfil_c)
           st.session_state.autenticado = True
           st.session_state.utilizador_atual = {
-              "email": email_cad,
-              "nome": nome_cad,
-              "sitio": sitio_cad,
-              "perfil": perfil_cad,
+              "email": email_c,
+              "nome": nome_c,
+              "sitio": sitio_c,
+              "perfil": perfil_c,
           }
-          st.query_params["user_email"] = email_cad
-          st.session_state.lote_config["sitio"] = sitio_cad
-          guardar_dados_granja()
-          st.success("Conta criada com sucesso! A entrar...")
+          guardar_dados_operacionais()
+          js_gravar = f"""
+                <script>
+                localStorage.setItem('granja_user_email', '{email_c}');
+                window.location.href = window.location.pathname + '?user_email={email_c}';
+                </script>
+                """
+          components.html(js_gravar, height=0)
+          st.success("Conta criada com sucesso!")
           st.rerun()
 
-# ==================== APLICAÇÃO PRINCIPAL (PÓS-LOGIN) ====================
+# =====================================================================
+# 6. APLICAÇÃO PRINCIPAL (INTERFACE E FUNCIONALIDADES)
+# =====================================================================
 else:
   perfil_atual = st.session_state.utilizador_atual.get(
       "perfil", "Patrão / Dono"
   )
 
-  col_cab1, col_cab2 = st.columns([4, 1])
-  with col_cab1:
+  col_h1, col_h2 = st.columns([4, 1])
+  with col_h1:
     st.markdown(
         f"""
         <div style="background-color: #343a40; padding: 12px; border-radius: 8px; color: white;">
             <h4 style="margin:0; color: white;">📦 Sítio: {st.session_state.lote_config['sitio']} | Lote: {st.session_state.lote_config['lote']}</h4>
-            <p style="margin:0; font-size: 12px; color: #f8f9fa;">Granjeiro(a): {st.session_state.utilizador_atual.get('nome', 'Utilizador')} &nbsp;|&nbsp; <b>Perfil: {perfil_atual}</b></p>
+            <p style="margin:0; font-size: 12px; color: #f8f9fa;">Utilizador: {st.session_state.utilizador_atual.get('nome')} | <b>Perfil: {perfil_atual}</b></p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-  with col_cab2:
+  with col_h2:
     if st.button("🚪 Sair", type="secondary"):
+      js_sair = """
+            <script>
+            localStorage.removeItem('granja_user_email');
+            window.location.href = window.location.pathname;
+            </script>
+            """
+      components.html(js_sair, height=0)
       st.session_state.autenticado = False
       st.session_state.utilizador_atual = {}
-      st.query_params.clear()
       st.rerun()
 
   st.write("")
 
   if perfil_atual == "Patrão / Dono":
-    lista_menus = [
+    menus = [
         "🏠 Início",
         "📉 Mortalidade",
         "🚚 Ração & Estoque",
@@ -390,7 +398,7 @@ else:
         "📂 Histórico & Estatísticas",
     ]
   else:
-    lista_menus = [
+    menus = [
         "🏠 Início",
         "📉 Mortalidade",
         "🚚 Ração & Estoque",
@@ -401,46 +409,40 @@ else:
     ]
 
   menu = st.radio(
-      "Navegação", lista_menus, horizontal=True, label_visibility="collapsed"
+      "Navegação", menus, horizontal=True, label_visibility="collapsed"
   )
-
   st.divider()
 
   num_g = st.session_state.lote_config["num_granjas"]
   granjas_ativas = [f"Granja {i}" for i in range(1, num_g + 1)]
 
-  total_aloj_geral = sum(
+  total_aloj = sum(
       st.session_state.lote_config["aves"][g] for g in granjas_ativas
   )
-  mortes_geral_total = sum(
+  total_mortes = sum(
       st.session_state.df_mortalidade[g].sum() for g in granjas_ativas
   )
-  saldo_geral_vivas = total_aloj_geral - mortes_geral_total
-
-  racao_chegada_geral = sum(
+  total_vivas = total_aloj - total_mortes
+  racao_chegada = sum(
       st.session_state.df_racao[f"{g} (Kg)"].sum() for g in granjas_ativas
   )
-  estoque_silo_geral = sum(
+  estoque_silo = sum(
       st.session_state.lote_config["estoque_silo"][g] for g in granjas_ativas
   )
-  racao_utilizada_geral = max(
-      0.0, racao_chegada_geral - estoque_silo_geral
-  )
+  racao_utilizada = max(0.0, racao_chegada - estoque_silo)
 
-  # ==================== 1. INÍCIO ====================
+  # [MENU 1] INÍCIO
   if menu == "🏠 Início":
-    st.subheader("Configuração do Sítio, Lote e Aviários/Granjas")
-
-    with st.form("form_config_lote"):
-      sitio_input = st.text_input(
+    st.subheader("Configuração do Sítio, Lote e Aviários")
+    with st.form("cfg_lote"):
+      s_in = st.text_input(
           "Nome do Sítio", value=st.session_state.lote_config["sitio"]
       )
-      lote_input = st.text_input(
+      l_in = st.text_input(
           "Identificação do Lote", value=st.session_state.lote_config["lote"]
       )
-
-      num_granjas_input = st.selectbox(
-          "Número de Granjas/Aviários Ativos (1 a 10)",
+      n_granjas_in = st.selectbox(
+          "Número de Granjas Ativas (1 a 10)",
           options=list(range(1, 11)),
           index=num_g - 1,
       )
@@ -448,451 +450,184 @@ else:
       st.markdown("---")
       st.write("### Aves Alojadas por Granja")
       aves_temp = {}
-
-      for i in range(1, num_granjas_input + 1):
+      for i in range(1, n_granjas_in + 1):
         g_nome = f"Granja {i}"
         val_atual = int(st.session_state.lote_config["aves"].get(g_nome, 0))
         aves_temp[g_nome] = st.number_input(
-            f"Aves alojadas - {g_nome}", value=val_atual, step=100
+            f"Aves - {g_nome}", value=val_atual, step=100
         )
 
-      btn_salvar = st.form_submit_button("Atualizar Informações do Lote")
-      if btn_salvar:
-        st.session_state.lote_config["sitio"] = sitio_input
-        st.session_state.lote_config["lote"] = lote_input
-        st.session_state.lote_config["num_granjas"] = num_granjas_input
+      if st.form_submit_button("Atualizar Informações"):
+        st.session_state.lote_config["sitio"] = s_in
+        st.session_state.lote_config["lote"] = l_in
+        st.session_state.lote_config["num_granjas"] = n_granjas_in
         for g_nome, val in aves_temp.items():
           st.session_state.lote_config["aves"][g_nome] = val
-        guardar_dados_granja()
-        st.success("Dados do sítio, lote e granjas atualizados com sucesso!")
+        guardar_dados_operacionais()
+        st.success("Informações atualizadas com sucesso!")
         st.rerun()
 
-    resumo_cards_html = ""
-    for g in granjas_ativas:
-      vivas_g = (
-          st.session_state.lote_config["aves"][g]
-          - st.session_state.df_mortalidade[g].sum()
-      )
-      resumo_cards_html += (
-          f"<td><b>{g} (Vivas)</b><br>{vivas_g:,}</td>"
-      )
-
-    st.markdown(
-        f"""
-        <div style="background: linear-gradient(135deg, #495057 0%, #343a40 100%); padding: 15px; border-radius: 10px; color: white;">
-            <h4 style="margin:0; color: white;">🏡 Sítio: {st.session_state.lote_config['sitio']} | Lote: {st.session_state.lote_config['lote']}</h4>
-            <hr style="margin: 8px 0; border-color: rgba(255,255,255,0.3);">
-            <table style="width:100%; color: white; text-align: center;">
-                <tr>
-                    {resumo_cards_html}
-                    <td><b>Total Lote</b><br>{saldo_geral_vivas:,}</td>
-                </tr>
-            </table>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    if perfil_atual == "Patrão / Dono":
-      st.write("")
-      st.markdown("---")
-      st.subheader("⚠️ Zona de Gestão do Lote")
-
-      if "confirmar_finalizacao" not in st.session_state:
-        st.session_state.confirmar_finalizacao = False
-
-      if not st.session_state.confirmar_finalizacao:
-        if st.button("🏁 Finalizar Lote Atual", type="secondary"):
-          st.session_state.confirmar_finalizacao = True
-          st.rerun()
-      else:
-        st.warning(
-            "⚠️ **Atenção:** Ao finalizar o lote, os dados atuais serão"
-            " arquivados no Histórico e o sistema será redefinido. Deseja mesmo"
-            " prosseguir?"
-        )
-        col_f1, col_f2 = st.columns(2)
-        with col_f1:
-          if st.button("✅ Sim, Finalizar Definitivamente", type="primary"):
-            novo_historico = {
-                "Lote": st.session_state.lote_config["lote"],
-                "Início": st.session_state.lote_config["inicio"],
-                "Aves Alojadas": total_aloj_geral,
-                "Total Aves Mortas": mortes_geral_total,
-                "Ração Consumida (Kg)": racao_utilizada_geral,
-                "Conversão Final": 1.500,
-                "R$ por Cabeça": 1.95,
-                "Comissão Total (R$)": total_aloj_geral * 1.95,
-            }
-            st.session_state.historico_lotes.append(novo_historico)
-            st.session_state.lote_config["lote"] = "Novo Lote - NÚCLEO 1"
-            for i in range(1, 11):
-              st.session_state.df_mortalidade[f"Granja {i}"] = 0
-            st.session_state.confirmar_finalizacao = False
-            guardar_dados_granja()
-            st.success("Lote finalizado e arquivado com sucesso!")
-            st.rerun()
-        with col_f2:
-          if st.button("❌ Cancelar"):
-            st.session_state.confirmar_finalizacao = False
-            st.rerun()
-
-  # ==================== 2. MORTALIDADE ====================
+  # [MENU 2] MORTALIDADE
   elif menu == "📉 Mortalidade":
     st.subheader("Controle Diário de Mortalidade (45 Dias)")
-
-    mortes_topo_html = ""
-    for g in granjas_ativas:
-      vivas_g = (
-          st.session_state.lote_config["aves"][g]
-          - st.session_state.df_mortalidade[g].sum()
-      )
-      mortes_topo_html += f"<td><b>{g}:</b><br>{vivas_g:,} aves (Mortes: {st.session_state.df_mortalidade[g].sum()})</td>"
-
-    st.markdown(
-        f"""
-        <div style="background: linear-gradient(135deg, #495057 0%, #343a40 100%); padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
-            <h5 style="margin:0; text-align:center; color: white;">📊 Aves Vivas Atuais ({st.session_state.lote_config['sitio']})</h5>
-            <table style="width:100%; color: white; text-align: center; margin-top: 8px;">
-                <tr>
-                    {mortes_topo_html}
-                </tr>
-            </table>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    colunas_mostrar_mort = ["Dia"] + granjas_ativas
-    df_mort_editado = st.data_editor(
-        st.session_state.df_mortalidade[colunas_mostrar_mort],
+    cols_m = ["Dia"] + granjas_ativas
+    df_m_edit = st.data_editor(
+        st.session_state.df_mortalidade[cols_m],
         num_rows="fixed",
         use_container_width=True,
-        key="editor_mortalidade",
     )
-    if not df_mort_editado.equals(
-        st.session_state.df_mortalidade[colunas_mostrar_mort]
-    ):
+    if not df_m_edit.equals(st.session_state.df_mortalidade[cols_m]):
       for g in granjas_ativas:
-        st.session_state.df_mortalidade[g] = df_mort_editado[g]
-      guardar_dados_granja()
+        st.session_state.df_mortalidade[g] = df_m_edit[g]
+      guardar_dados_operacionais()
 
-  # ==================== 3. RAÇÃO & ESTOQUE ====================
+  # [MENU 3] RAÇÃO & ESTOQUE
   elif menu == "🚚 Ração & Estoque":
     st.subheader("Gestão de Cargas de Ração e Estoque no Silo")
-
-    with st.expander(
-        "📦 Atualizar Estoque Atual nos Silos (Restante)", expanded=True
-    ):
-      mudou_silo = False
+    with st.expander("📦 Atualizar Silos", expanded=True):
+      mudou = False
       for g in granjas_ativas:
-        novo_val_silo = st.number_input(
-            f"Sobra no Silo - {g} (Kg)",
+        val_s = st.number_input(
+            f"Sobra Silo - {g} (Kg)",
             value=float(
                 st.session_state.lote_config["estoque_silo"].get(g, 0.0)
             ),
             step=50.0,
-            key=f"silo_{g}",
+            key=f"s_{g}",
         )
         if (
-            novo_val_silo
+            val_s
             != st.session_state.lote_config["estoque_silo"].get(g, 0.0)
         ):
-          st.session_state.lote_config["estoque_silo"][g] = novo_val_silo
-          mudou_silo = True
-      if mudou_silo:
-        guardar_dados_granja()
+          st.session_state.lote_config["estoque_silo"][g] = val_s
+          mudou = True
+      if mudou:
+        guardar_dados_operacionais()
 
-    st.info(
-        f"🚚 **Resumo Geral:** Chegado: **{racao_chegada_geral:,.1f} kg** | Silo:"
-        f" **{estoque_silo_geral:,.1f} kg** | Utilizada:"
-        f" **{racao_utilizada_geral:,.1f} kg**"
-    )
-
-    colunas_mostrar_racao = (
+    cols_r = (
         ["Nº Caminhão / Nota", "Data"]
         + [f"{g} (Kg)" for g in granjas_ativas]
         + ["Fórmula / Tipo"]
     )
-    df_rac_editado = st.data_editor(
-        st.session_state.df_racao[colunas_mostrar_racao],
+    df_r_edit = st.data_editor(
+        st.session_state.df_racao[cols_r],
         num_rows="fixed",
         use_container_width=True,
-        key="editor_racao",
     )
-    if not df_rac_editado.equals(
-        st.session_state.df_racao[colunas_mostrar_racao]
-    ):
-      for col in colunas_mostrar_racao:
-        st.session_state.df_racao[col] = df_rac_editado[col]
-      guardar_dados_granja()
+    if not df_r_edit.equals(st.session_state.df_racao[cols_r]):
+      for c in cols_r:
+        st.session_state.df_racao[c] = df_r_edit[c]
+      guardar_dados_operacionais()
 
-  # ==================== 4. BALANÇA ====================
+  # [MENU 4] BALANÇA
   elif menu == "⚖️ Balança":
-    st.subheader("Pesagens Semanais (De 7 em 7 Dias)")
-    colunas_mostrar_bal = ["Semana / Idade"] + [
-        f"{g} (Peso g)" for g in granjas_ativas
-    ]
-    df_bal_editado = st.data_editor(
-        st.session_state.df_balanca[colunas_mostrar_bal],
+    st.subheader("Pesagens Semanais")
+    cols_b = ["Semana / Idade"] + [f"{g} (Peso g)" for g in granjas_ativas]
+    df_b_edit = st.data_editor(
+        st.session_state.df_balanca[cols_b],
         num_rows="fixed",
         use_container_width=True,
-        key="editor_balanca",
     )
-    if not df_bal_editado.equals(
-        st.session_state.df_balanca[colunas_mostrar_bal]
-    ):
-      for col in colunas_mostrar_bal:
-        st.session_state.df_balanca[col] = df_bal_editado[col]
-      guardar_dados_granja()
+    if not df_b_edit.equals(st.session_state.df_balanca[cols_b]):
+      for c in cols_b:
+        st.session_state.df_balanca[c] = df_b_edit[c]
+      guardar_dados_operacionais()
 
-  # ==================== 5. CONVERSÃO ====================
+  # [MENU 5] CONVERSÃO
   elif menu == "🧮 Conversão":
-    st.subheader("Análise de Conversão Alimentar Interligada por Ciclos")
-
-    semanas_analise = []
-    dias_limite = [7, 14, 21, 28, 35, 42]
-
-    for i, d in enumerate(dias_limite):
-      vivas_d = 0
+    st.subheader("Análise de Conversão Alimentar")
+    analise = []
+    limites = [7, 14, 21, 28, 35, 42]
+    for i, d in enumerate(limites):
+      v_d = 0
       for g in granjas_ativas:
-        aloj_g = st.session_state.lote_config["aves"][g]
-        mortes_g = st.session_state.df_mortalidade[g].head(d).sum()
-        vivas_d += aloj_g - mortes_g
-
-      pesos_semana = []
-      for g in granjas_ativas:
-        p_val = st.session_state.df_balanca.loc[i, f"{g} (Peso g)"]
-        if p_val > 0:
-          pesos_semana.append(p_val)
-      peso_medio = (
-          sum(pesos_semana) / len(pesos_semana) if pesos_semana else 0.0
-      )
-
+        v_d += (
+            st.session_state.lote_config["aves"][g]
+            - st.session_state.df_mortalidade[g].head(d).sum()
+        )
+      p_semana = [
+          st.session_state.df_balanca.loc[i, f"{g} (Peso g)"]
+          for g in granjas_ativas
+          if st.session_state.df_balanca.loc[i, f"{g} (Peso g)"] > 0
+      ]
+      p_medio = sum(p_semana) / len(p_semana) if p_semana else 0.0
       fator = min(1.0, (i + 1) / 6.0)
-      racao_acum = max(0.0, racao_utilizada_geral * fator)
-      biomassa = (vivas_d * peso_medio) / 1000.0
-      ca = (racao_acum / biomassa) if biomassa > 0 else 0.0
-
-      semanas_analise.append({
+      r_acum = max(0.0, racao_utilizada * fator)
+      biomassa = (v_d * p_medio) / 1000.0
+      ca = (r_acum / biomassa) if biomassa > 0 else 0.0
+      analise.append({
           "Período": f"Semana {i+1} ({d} dias)",
-          "Aves Vivas": vivas_d,
-          "Peso Médio (g)": peso_medio,
+          "Aves Vivas": v_d,
+          "Peso Médio (g)": p_medio,
           "Peso Vivo Total (Kg)": round(biomassa, 1),
-          "Ração Consumida (Kg)": round(racao_acum, 1),
+          "Ração Consumida (Kg)": round(r_acum, 1),
           "Conversão (CA)": round(ca, 3) if ca > 0 else "Pendente",
       })
-
     st.dataframe(
-        pd.DataFrame(semanas_analise), use_container_width=True, hide_index=True
+        pd.DataFrame(analise), use_container_width=True, hide_index=True
     )
 
-  # ==================== 6. OBSERVAÇÕES ====================
+  # [MENU 6] OBSERVAÇÕES
   elif menu == "📝 Observações":
-    st.subheader("Área de Observações e Lembretes")
-
-    st.markdown("### 💊 Fase 1: Controle de Medicações e Aplicações (45 Dias)")
-    df_med_editado = st.data_editor(
+    st.subheader("Observações e Lembretes")
+    st.markdown("### 💊 Controle de Medicações")
+    df_med_edit = st.data_editor(
         st.session_state.df_medicacao,
         num_rows="fixed",
         use_container_width=True,
-        key="editor_medicacao",
     )
-    if not df_med_editado.equals(st.session_state.df_medicacao):
-      st.session_state.df_medicacao = df_med_editado
-      guardar_dados_granja()
+    if not df_med_edit.equals(st.session_state.df_medicacao):
+      st.session_state.df_medicacao = df_med_edit
+      guardar_dados_operacionais()
 
     st.write("")
-    st.markdown("---")
-    st.markdown("### 📌 Fase 2: Lembretes e Manutenção")
-    novo_lembrete = st.text_area(
-        "Bloco de Notas / Manutenção",
+    novo_l = st.text_area(
+        "Lembretes e Manutenção",
         value=st.session_state.lembretes_manutencao,
-        height=150,
+        height=120,
     )
     if st.button("Guardar Lembretes"):
-      st.session_state.lembretes_manutencao = novo_lembrete
-      guardar_dados_granja()
-      st.success("Lembretes atualizados com sucesso!")
+      st.session_state.lembretes_manutencao = novo_l
+      guardar_dados_operacionais()
+      st.success("Lembretes guardados!")
 
-    st.write("")
-    st.markdown("---")
-    st.markdown("### 💰 Fase 3: Anotações Financeiras e Resumo do Lote")
-
-    with st.form("form_anotacoes_financeiras"):
-      f_sitio = st.text_input(
-          "Sítio", value=st.session_state.anotacoes_financeiras["sitio"]
-      )
-      col_fin1, col_fin2 = st.columns(2)
-      with col_fin1:
-        f_alojada = st.number_input(
-            "Quantidade alojada",
-            value=int(
-                st.session_state.anotacoes_financeiras["qtd_alojada"]
-            ),
-            step=100,
-        )
-        f_abatidas = st.number_input(
-            "Quantidade abatidas",
-            value=int(
-                st.session_state.anotacoes_financeiras["qtd_abatidas"]
-            ),
-            step=100,
-        )
-        f_conversao = st.number_input(
-            "Conversão do lote",
-            value=float(
-                st.session_state.anotacoes_financeiras["conversao_lote"]
-            ),
-            format="%.3f",
-            step=0.005,
-        )
-      with col_fin2:
-        f_pagamento = st.number_input(
-            "Pagamento por ave (R$)",
-            value=float(
-                st.session_state.anotacoes_financeiras["pagamento_ave"]
-            ),
-            format="%.2f",
-            step=0.01,
-        )
-        f_valor_final = st.number_input(
-            "Valor final recebido (R$)",
-            value=float(
-                st.session_state.anotacoes_financeiras["valor_final"]
-            ),
-            format="%.2f",
-            step=100.0,
-        )
-
-      btn_salvar_fin = st.form_submit_button(
-          "Guardar Anotações Financeiras"
-      )
-      if btn_salvar_fin:
-        st.session_state.anotacoes_financeiras = {
-            "sitio": f_sitio,
-            "qtd_alojada": f_alojada,
-            "qtd_abatidas": f_abatidas,
-            "conversao_lote": f_conversao,
-            "pagamento_ave": f_pagamento,
-            "valor_final": f_valor_final,
-        }
-        guardar_dados_granja()
-        st.success("Anotações financeiras guardadas com sucesso!")
-
-  # ==================== 7. FECHAMENTO & ACERTO (EXCLUSIVO PATRÃO) ====================
+  # [MENU 7] FECHAMENTO (EXCLUSIVO PATRÃO)
   elif menu == "💰 Fechamento & Acerto" and perfil_atual == "Patrão / Dono":
-    st.subheader("Fechamento do Lote e Acerto com a Integradora")
-    st.info(
-        "Registe abaixo os dados comerciais do lote encerrado (empresa/integradora,"
-        " conversão obtida, fator de produção e valores de comissão recebidos)."
-    )
-
-    with st.form("form_fechamento_lote"):
-      col_f_1, col_f_2 = st.columns(2)
-      with col_f_1:
-        integradora_input = st.text_input(
-            "Nome da Integradora (ex: Zanqueta)", value="Zanqueta"
-        )
-        conv_final_input = st.number_input(
-            "Conversão Alimentar (CA) Final",
-            value=1.55,
-            format="%.3f",
-            step=0.005,
-        )
-      with col_f_2:
-        fator_prod_input = st.number_input(
-            "Fator de Produção (FP)", value=432.5, format="%.1f", step=0.5
-        )
-        val_cabeca_input = st.number_input(
-            "Valor Recebido por Cabeça (R$)",
-            value=1.95,
-            format="%.2f",
-            step=0.01,
-        )
-
-      comissao_total_calc = total_aloj_geral * val_cabeca_input
-      st.write(
-          f"💡 **Comissão Total Estimada Calculada:** R$"
-          f" {comissao_total_calc:,.2f} (para {total_aloj_geral:,} aves)"
+    st.subheader("Fechamento do Lote")
+    with st.form("form_fech"):
+      c_fin = st.number_input(
+          "Conversão Final", value=1.55, format="%.3f", step=0.005
       )
-      comissao_final_input = st.number_input(
-          "Valor Final Recebido da Comissão (R$)",
-          value=float(comissao_total_calc),
+      v_cab = st.number_input(
+          "Valor Recebido por Cabeça (R$)", value=1.95, format="%.2f", step=0.01
+      )
+      comissao_calc = total_aloj * v_cab
+      st.write(f"💡 Comissão Calculada: R$ {comissao_calc:,.2f}")
+      v_final = st.number_input(
+          "Comissão Final Recebida (R$)",
+          value=float(comissao_calc),
           step=100.0,
       )
 
-      btn_salvar_fechamento = st.form_submit_button(
-          "Guardar Acerto no Histórico"
-      )
-      if btn_salvar_fechamento:
-        novo_acerto = {
+      if st.form_submit_button("Guardar no Histórico"):
+        st.session_state.historico_lotes.append({
             "Lote": st.session_state.lote_config["lote"],
             "Início": st.session_state.lote_config["inicio"],
-            "Aves Alojadas": total_aloj_geral,
-            "Total Aves Mortas": mortes_geral_total,
-            "Ração Consumida (Kg)": racao_utilizada_geral,
-            "Conversão Final": conv_final_input,
-            "R$ por Cabeça": val_cabeca_input,
-            "Comissão Total (R$)": comissao_final_input,
-        }
-        st.session_state.historico_lotes.append(novo_acerto)
-        guardar_dados_granja()
-        st.success(
-            "Acerto financeiro e comercial guardado com sucesso no Histórico!"
-        )
+            "Aves Alojadas": total_aloj,
+            "Total Aves Mortas": total_mortes,
+            "Ração Consumida (Kg)": racao_utilizada,
+            "Conversão Final": c_fin,
+            "R$ por Cabeça": v_cab,
+            "Comissão Total (R$)": v_final,
+        })
+        guardar_dados_operacionais()
+        st.success("Acerto guardado no histórico com sucesso!")
 
-  # ==================== 8. HISTÓRICO & ESTATÍSTICAS ====================
+  # [MENU 8] HISTÓRICO & ESTATÍSTICAS
   elif menu == "📂 Histórico & Estatísticas":
-    st.subheader(
-        "📊 Histórico de Lotes e Análise Estatística / Filtros Comparativos"
-    )
-
+    st.subheader("📊 Histórico de Lotes e Estatísticas")
     if not st.session_state.historico_lotes:
-      st.info("Ainda não existem lotes arquivados no histórico.")
+      st.info("Sem lotes arquivados.")
     else:
-      df_hist = pd.DataFrame(st.session_state.historico_lotes)
-
-      st.markdown("### 🏆 Destaques Estatísticos dos Lotes")
-      col_e1, col_e2, col_e3, col_e4 = st.columns(4)
-
-      lote_menor_morte = df_hist.loc[df_hist["Total Aves Mortas"].idxmin()]
-      with col_e1:
-        st.metric(
-            label="📉 Menor Mortalidade",
-            value=lote_menor_morte["Lote"],
-            delta=f"{lote_menor_morte['Total Aves Mortas']:,} mortes",
-            delta_color="inverse",
-        )
-
-      lote_maior_pagto = df_hist.loc[df_hist["R$ por Cabeça"].idxmax()]
-      with col_e2:
-        st.metric(
-            label="💰 Maior Pagamento/Ave",
-            value=lote_maior_pagto["Lote"],
-            delta=f"R$ {lote_maior_pagto['R$ por Cabeça']:.2f} por ave",
-        )
-
-      lote_maior_aloj = df_hist.loc[df_hist["Aves Alojadas"].idxmax()]
-      with col_e3:
-        st.metric(
-            label="📈 Maior Alojamento",
-            value=lote_maior_aloj["Lote"],
-            delta=f"{lote_maior_aloj['Aves Alojadas']:,} aves",
-        )
-
-      lote_menos_racao = df_hist.loc[
-          df_hist["Ração Consumida (Kg)"].idxmin()
-      ]
-      with col_e4:
-        st.metric(
-            label="🌾 Menor Consumo Ração",
-            value=lote_menos_racao["Lote"],
-            delta=f"{lote_menos_racao['Ração Consumida (Kg)']:,.0f} kg",
-            delta_color="inverse",
-        )
-
-      st.write("")
-      st.markdown("---")
-      st.markdown("### 📋 Tabela Completa do Histórico de Lotes")
-      st.dataframe(df_hist, use_container_width=True, hide_index=True)
+      df_h = pd.DataFrame(st.session_state.historico_lotes)
+      st.dataframe(df_h, use_container_width=True, hide_index=True)
