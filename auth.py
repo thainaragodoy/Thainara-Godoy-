@@ -62,8 +62,13 @@ def gerenciar_autenticacao():
         """
     components.html(js_auto_login, height=0)
 
+    # Leitura totalmente blindada contra qualquer erro de atributos da URL
+    saved_email = None
     try:
-      saved_email = st.query_params.get("user_email", None)
+      if "user_email" in st.query_params:
+        saved_email = st.query_params["user_email"]
+        if isinstance(saved_email, list):
+          saved_email = saved_email[0]
     except:
       saved_email = None
 
@@ -77,5 +82,6 @@ def gerenciar_autenticacao():
             "nome": u_data["nome"],
             "sitio": u_data["sitio"],
             "perfil": u_data.get("perfil", "Patrão / Dono"),
+        }
 
   return st.session_state.autenticado
