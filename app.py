@@ -41,7 +41,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ==================== PERSISTÊNCIA (JSON APENAS DE UTILIZADORES E DADOS) ====================
+# ==================== PERSISTÊNCIA (JSON) ====================
 ARQUIVO_USUARIOS = "usuarios.json"
 ARQUIVO_DADOS = "dados_granja.json"
 
@@ -107,9 +107,27 @@ def guardar_dados_granja():
     json.dump(dados_para_salvar, f, ensure_ascii=False, indent=4)
 
 
-# ==================== ESTADO DE AUTENTICAÇÃO INDIVIDUAL (POR ABA/DISPOSITIVO) ====================
+# ==================== CONTROLE DE SESSÃO INTELIGENTE (COM LEMBRAR NESTE NAVEGADOR) ====================
 if "autenticado" not in st.session_state:
-  st.session_state.autenticado = False
+  # Verifica se existe um login salvo na memória do navegador deste aparelho específico
+  params = st.query_params
+  saved_email = params.get("user_email", None)
+
+  if saved_email:
+    base_usuarios = carregar_utilizadores()
+    if saved_email in base_usuarios:
+      dados_user = base_usuarios[saved_email]
+      st.session_state.autenticado = True
+      st.session_state.utilizador_atual = {
+          "email": saved_email,
+          "nome": dados_user["nome"],
+          "sitio": dados_user["sitio"],
+          "perfil": dados_user.get("perfil", "Patrão / Dono"),
+      }
+    else:
+      st.session_state.autenticado = False
+  else:
+    st.session_state.autenticado = False
 
 if "utilizador_atual" not in st.session_state:
   st.session_state.utilizador_atual = {}
@@ -264,6 +282,9 @@ if not st.session_state.autenticado:
       st.write("")
       email_login = st.text_input("E-mail", key="login_email")
       senha_login = st.text_input("Senha", type="password", key="login_senha")
+      lembrar_login = st.checkbox(
+          "Lembrar de mim neste dispositivo", value=True
+      )
       st.write("")
 
       if st.button("Entrar no Sistema", type="primary", use_container_width=True):
@@ -278,6 +299,8 @@ if not st.session_state.autenticado:
                 "sitio": dados_user["sitio"],
                 "perfil": dados_user.get("perfil", "Patrão / Dono"),
             }
+            if lembrar_login:
+              st.query_params["user_email"] = email_login
             st.session_state.lote_config["sitio"] = dados_user["sitio"]
             st.success("Login efetuado com sucesso!")
             st.rerun()
@@ -323,6 +346,7 @@ if not st.session_state.autenticado:
               "sitio": sitio_cad,
               "perfil": perfil_cad,
           }
+          st.query_params["user_email"] = email_cad
           st.session_state.lote_config["sitio"] = sitio_cad
           guardar_dados_granja()
           st.success("Conta criada com sucesso! A entrar...")
@@ -349,6 +373,7 @@ else:
     if st.button("🚪 Sair", type="secondary"):
       st.session_state.autenticado = False
       st.session_state.utilizador_atual = {}
+      st.query_params.clear()
       st.rerun()
 
   st.write("")
