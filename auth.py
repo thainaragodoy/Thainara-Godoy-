@@ -43,14 +43,14 @@ def salvar_utilizador(email, senha, nome, sitio, perfil):
 
 
 def gerenciar_autenticacao():
-  """Controla o login persistente via localStorage e parâmetros de URL de forma isolada."""
+  """Verifica o login persistente via localStorage sem causar conflitos de rerun."""
   if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
   if "utilizador_atual" not in st.session_state:
     st.session_state.utilizador_atual = {}
 
-  # Script para detetar o e-mail gravado no telemóvel e injetar na URL instantaneamente
+  # Injeta script para detetar o e-mail no telemóvel e preencher na URL
   if not st.session_state.autenticado:
     js_auto_login = """
         <script>
@@ -80,6 +80,5 @@ def gerenciar_autenticacao():
             "sitio": u_data["sitio"],
             "perfil": u_data.get("perfil", "Patrão / Dono"),
         }
-        st.rerurn()
 
   return st.session_state.autenticado
