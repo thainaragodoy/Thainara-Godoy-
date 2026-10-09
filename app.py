@@ -5,13 +5,12 @@ import streamlit as st
 
 st.set_page_config(page_title="Gestão da Granja Profissional", layout="wide")
 
-# ==================== ESTILIZAÇÃO CSS (FUNDO, CORES E CONTRASTE ESCURO/CLARO) ====================
+# ==================== ESTILIZAÇÃO CSS ====================
 FUNDO_URL = "fundo_pintinhos.png"
 
 st.markdown(
     f"""
     <style>
-    /* Fundo geral da aplicação com a imagem personalizada e semi-transparente */
     .stApp {{
         background: linear-gradient(rgba(255, 255, 255, 0.90), rgba(240, 242, 245, 0.92)), url("{FUNDO_URL}");
         background-size: cover;
@@ -30,7 +29,6 @@ st.markdown(
         }}
     }}
 
-    /* Forçar legibilidade correta dos textos gerais do Streamlit nos dois modos */
     p, span, label, h1, h2, h3, h4, h5, h6 {{
         color: inherit !important;
     }}
@@ -43,10 +41,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ==================== PERSISTÊNCIA (JSON) ====================
+# ==================== PERSISTÊNCIA (JSON APENAS DE UTILIZADORES E DADOS) ====================
 ARQUIVO_USUARIOS = "usuarios.json"
 ARQUIVO_DADOS = "dados_granja.json"
-ARQUIVO_SESSAO = "sessao_ativa.json"
 
 
 def carregar_utilizadores():
@@ -85,29 +82,6 @@ def salvar_utilizador(email, senha, nome, sitio, perfil):
     json.dump(usuarios, f, ensure_ascii=False, indent=4)
 
 
-def carregar_sessao_salva():
-  if os.path.exists(ARQUIVO_SESSAO):
-    try:
-      with open(ARQUIVO_SESSAO, "r", encoding="utf-8") as f:
-        return json.load(f)
-    except:
-      pass
-  return None
-
-
-def guardar_sessao_ativa(dados_utilizador):
-  with open(ARQUIVO_SESSAO, "w", encoding="utf-8") as f:
-    json.dump(dados_utilizador, f, ensure_ascii=False, indent=4)
-
-
-def limpar_sessao_ativa():
-  if os.path.exists(ARQUIVO_SESSAO):
-    try:
-      os.remove(ARQUIVO_SESSAO)
-    except:
-      pass
-
-
 def carregar_dados_granja():
   if os.path.exists(ARQUIVO_DADOS):
     try:
@@ -133,14 +107,9 @@ def guardar_dados_granja():
     json.dump(dados_para_salvar, f, ensure_ascii=False, indent=4)
 
 
-# ==================== VERIFICAÇÃO ROBUSTA DE SESSÃO PERSISTENTE ====================
+# ==================== ESTADO DE AUTENTICAÇÃO INDIVIDUAL (POR ABA/DISPOSITIVO) ====================
 if "autenticado" not in st.session_state:
-  sessao_previa = carregar_sessao_salva()
-  if sessao_previa and isinstance(sessao_previa, dict) and "email" in sessao_previa:
-    st.session_state.autenticado = True
-    st.session_state.utilizador_atual = sessao_previa
-  else:
-    st.session_state.autenticado = False
+  st.session_state.autenticado = False
 
 if "utilizador_atual" not in st.session_state:
   st.session_state.utilizador_atual = {}
@@ -279,8 +248,8 @@ if not st.session_state.autenticado:
   st.markdown(
       """
         <div style="background: linear-gradient(135deg, #343a40 0%, #212529 100%); padding: 30px; border-radius: 12px; color: white; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-            <h2 style="margin:0; font-size: 28px;">🐔 Sistema de Gestão Avícola Profissional</h2>
-            <p style="margin:8px 0 0 0; font-size: 15px; opacity: 0.9;">Plataforma de controlo operacional e financeiro de lotes</p>
+            <h2 style="margin:0; color: white; font-size: 28px;">🐔 Sistema de Gestão Avícola Profissional</h2>
+            <p style="margin:8px 0 0 0; color: #f8f9fa; font-size: 15px; opacity: 0.9;">Plataforma de controlo operacional e financeiro de lotes</p>
         </div>
         """,
       unsafe_allow_html=True,
@@ -303,14 +272,12 @@ if not st.session_state.autenticado:
           if base_usuarios[email_login]["senha"] == senha_login:
             st.session_state.autenticado = True
             dados_user = base_usuarios[email_login]
-            info_utilizador = {
+            st.session_state.utilizador_atual = {
                 "email": email_login,
                 "nome": dados_user["nome"],
                 "sitio": dados_user["sitio"],
                 "perfil": dados_user.get("perfil", "Patrão / Dono"),
             }
-            st.session_state.utilizador_atual = info_utilizador
-            guardar_sessao_ativa(info_utilizador)
             st.session_state.lote_config["sitio"] = dados_user["sitio"]
             st.success("Login efetuado com sucesso!")
             st.rerun()
@@ -350,20 +317,18 @@ if not st.session_state.autenticado:
               email_cad, senha_cad, nome_cad, sitio_cad, perfil_cad
           )
           st.session_state.autenticado = True
-          info_utilizador = {
+          st.session_state.utilizador_atual = {
               "email": email_cad,
               "nome": nome_cad,
               "sitio": sitio_cad,
               "perfil": perfil_cad,
           }
-          st.session_state.utilizador_atual = info_utilizador
-          guardar_sessao_ativa(info_utilizador)
           st.session_state.lote_config["sitio"] = sitio_cad
           guardar_dados_granja()
           st.success("Conta criada com sucesso! A entrar...")
           st.rerun()
 
-# ==================== APLICAÇÃO PRINCIPAL (PÓS-LOGIN / HOME) ====================
+# ==================== APLICAÇÃO PRINCIPAL (PÓS-LOGIN) ====================
 else:
   perfil_atual = st.session_state.utilizador_atual.get(
       "perfil", "Patrão / Dono"
@@ -383,7 +348,7 @@ else:
   with col_cab2:
     if st.button("🚪 Sair", type="secondary"):
       st.session_state.autenticado = False
-      limpar_sessao_ativa()
+      st.session_state.utilizador_atual = {}
       st.rerun()
 
   st.write("")
