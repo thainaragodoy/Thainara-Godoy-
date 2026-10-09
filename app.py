@@ -1,27 +1,18 @@
-import pandas as pd
-import streamlit as st
-import streamlit.components.v1 as components
-
-# Importa o módulo isolado de autenticação que criamos acima
-from auth import carregar_utilizadores, gerenciar_autenticacao, salvar_utilizador
-
-st.set_page_config(
-    page_title="Sistema de Gestão Avícola Profissional", layout="wide"
-)
-
-# Executa o controlo de login persistente
-esta_logado = gerenciar_autenticacao()
-
-# Resto do seu código do app.py continua aqui...
 import json
 import os
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
+# Importa o módulo isolado de autenticação
+from auth import carregar_utilizadores, gerenciar_autenticacao, salvar_utilizador
+
 st.set_page_config(
     page_title="Sistema de Gestão Avícola Profissional", layout="wide"
 )
+
+# Executa o controlo de login persistente de forma segura
+esta_logado = gerenciar_autenticacao()
 
 # =====================================================================
 # 1. MÓDULO DE ESTILO (CSS RESPONSIVO E TEMA CLARO/ESCURO)
@@ -55,48 +46,9 @@ st.markdown(
 )
 
 # =====================================================================
-# 2. MÓDULO DE DADOS & PERSISTÊNCIA (JSON)
+# 2. MÓDULO DE DADOS OPERACIONAIS (JSON)
 # =====================================================================
-ARQ_USUARIOS = "usuarios.json"
 ARQ_DADOS = "dados_granja.json"
-
-
-def carregar_utilizadores():
-  """Carrega ou cria a base de dados de utilizadores e senhas (usuarios.json)"""
-  if os.path.exists(ARQ_USUARIOS):
-    try:
-      with open(ARQ_USUARIOS, "r", encoding="utf-8") as f:
-        dados = json.load(f)
-        for email in dados:
-          if "perfil" not in dados[email]:
-            dados[email]["perfil"] = "Patrão / Dono"
-        return dados
-    except:
-      pass
-  padrao = {
-      "Canalthahodoy@gmail.com": {
-          "senha": "123",
-          "nome": "Thainara",
-          "sitio": "Sítio Boa Vista",
-          "perfil": "Patrão / Dono",
-      }
-  }
-  with open(ARQ_USUARIOS, "w", encoding="utf-8") as f:
-    json.dump(padrao, f, ensure_ascii=False, indent=4)
-  return padrao
-
-
-def salvar_utilizador(email, senha, nome, sitio, perfil):
-  """Salva um novo utilizador registado no usuarios.json"""
-  usuarios = carregar_utilizadores()
-  usuarios[email] = {
-      "senha": senha,
-      "nome": nome,
-      "sitio": sitio,
-      "perfil": perfil,
-  }
-  with open(ARQ_USUARIOS, "w", encoding="utf-8") as f:
-    json.dump(usuarios, f, ensure_ascii=False, indent=4)
 
 
 def carregar_dados_operacionais():
@@ -127,45 +79,7 @@ def guardar_dados_operacionais():
 
 
 # =====================================================================
-# 3. MÓDULO DE SESSÃO & CONTROLO DE LOGIN (PERSISTENTE VIA LOCALSTORAGE)
-# =====================================================================
-if "autenticado" not in st.session_state:
-  st.session_state.autenticado = False
-
-if "utilizador_atual" not in st.session_state:
-  st.session_state.utilizador_atual = {}
-
-# Script JS para recuperar a sessão anterior do navegador sem pedir senha de novo
-if not st.session_state.autenticado:
-  js_verificar_sessao = """
-    <script>
-    const savedEmail = localStorage.getItem('granja_user_email');
-    if (savedEmail && !window.location.search.includes('user_email=')) {
-        const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set('user_email', savedEmail);
-        window.location.search = urlParams.toString();
-    }
-    </script>
-    """
-  components.html(js_verificar_sessao, height=0)
-
-  params = st.query_params
-  saved_email = params.get("user_email", None)
-  if saved_email and not st.session_state.autenticado:
-    base_u = carregar_utilizadores()
-    if saved_email in base_u:
-      u_data = base_u[saved_email]
-      st.session_state.autenticado = True
-      st.session_state.utilizador_atual = {
-          "email": saved_email,
-          "nome": u_data["nome"],
-          "sitio": u_data["sitio"],
-          "perfil": u_data.get("perfil", "Patrão / Dono"),
-      }
-      st.rerun()
-
-# =====================================================================
-# 4. INICIALIZAÇÃO DOS DADOS DO APLICATIVO
+# 3. INICIALIZAÇÃO DOS DADOS DO APLICATIVO
 # =====================================================================
 dados_salvos = carregar_dados_operacionais()
 
@@ -283,7 +197,7 @@ if "anotacoes_financeiras" not in st.session_state:
 
 
 # =====================================================================
-# 5. TELA DE AUTENTICAÇÃO (LOGIN / REGISTO)
+# 4. TELA DE AUTENTICAÇÃO (LOGIN / REGISTO)
 # =====================================================================
 if not st.session_state.autenticado:
   st.markdown(
@@ -318,7 +232,7 @@ if not st.session_state.autenticado:
           js_gravar = f"""
                 <script>
                 localStorage.setItem('granja_user_email', '{email_l}');
-                window.location.href = window.location.pathname + '?user_email={email_l}';
+                window.parent.location.href = window.parent.location.pathname + '?user_email={email_l}';
                 </script>
                 """
           components.html(js_gravar, height=0)
@@ -360,7 +274,7 @@ if not st.session_state.autenticado:
           js_gravar = f"""
                 <script>
                 localStorage.setItem('granja_user_email', '{email_c}');
-                window.location.href = window.location.pathname + '?user_email={email_c}';
+                window.parent.location.href = window.parent.location.pathname + '?user_email={email_c}';
                 </script>
                 """
           components.html(js_gravar, height=0)
@@ -368,7 +282,7 @@ if not st.session_state.autenticado:
           st.rerun()
 
 # =====================================================================
-# 6. APLICAÇÃO PRINCIPAL (INTERFACE E FUNCIONALIDADES)
+# 5. APLICAÇÃO PRINCIPAL (INTERFACE E FUNCIONALIDADES)
 # =====================================================================
 else:
   perfil_atual = st.session_state.utilizador_atual.get(
@@ -391,7 +305,7 @@ else:
       js_sair = """
             <script>
             localStorage.removeItem('granja_user_email');
-            window.location.href = window.location.pathname;
+            window.parent.location.href = window.parent.location.pathname;
             </script>
             """
       components.html(js_sair, height=0)
