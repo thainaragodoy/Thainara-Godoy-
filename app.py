@@ -6,12 +6,13 @@ import streamlit as st
 st.set_page_config(page_title="Gestão da Granja Profissional", layout="wide")
 
 # ==================== ESTILIZAÇÃO CSS (FUNDO COM IMAGEM E PALETA ACINZENTADA) ====================
-FUNDO_URL = "https://images.unsplash.com/photo-1516467508483-a7212febe31a?q=80&w=1000&auto=format&fit=crop"  # Substitua se preferir o link direto da imagem dos pintinhos no seu GitHub/HuggingFace
+# Nome do arquivo da imagem enviado por você carregado diretamente no repositório do GitHub:
+FUNDO_URL = "fundo_pintinhos.png"
 
 st.markdown(
     f"""
     <style>
-    /* Fundo geral da aplicação com imagem semi-transparente e paleta acinzentada */
+    /* Fundo geral da aplicação com a imagem personalizada e semi-transparente */
     .stApp {{
         background: linear-gradient(rgba(255, 255, 255, 0.90), rgba(240, 242, 245, 0.92)), url("{FUNDO_URL}");
         background-size: cover;
@@ -28,18 +29,8 @@ st.markdown(
         }}
     }}
 
-    /* Substituição do Azul por Tons Acinzentados, Preto (Dark) e Branco (Light) */
     div[data-baseweb="tab-highlight"] {{
         background-color: #495057 !important;
-    }}
-    
-    /* Cartões e caixas com design neutro e elegante */
-    .custom-card {{
-        background-color: rgba(255, 255, 255, 0.85);
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #ced4da;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }}
     </style>
     """,
@@ -148,7 +139,6 @@ if "autenticado" not in st.session_state:
 if "utilizador_atual" not in st.session_state:
   st.session_state.utilizador_atual = {}
 
-# Carrega dados salvos anteriormente ou define padrões
 dados_salvos = carregar_dados_granja()
 
 aves_iniciais = {f"Granja {i}": (62000 if i <= 2 else 0) for i in range(1, 11)}
@@ -269,7 +259,7 @@ if "anotacoes_financeiras" not in st.session_state:
     }
 
 
-# ==================== TELA DE LOGIN / CADASTRO (DESIGN ISOLADO ACINZENTADO) ====================
+# ==================== TELA DE LOGIN / CADASTRO ====================
 if not st.session_state.autenticado:
   st.markdown(
       """
@@ -312,10 +302,7 @@ if not st.session_state.autenticado:
           else:
             st.error("Senha incorreta.")
         else:
-          st.error(
-              "E-mail não registado. Verifique o e-mail ou crie uma conta na"
-              " aba ao lado."
-          )
+          st.error("E-mail não registado.")
 
     with tab_cadastro:
       st.write("")
