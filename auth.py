@@ -56,13 +56,21 @@ def gerenciar_autenticacao():
     st.session_state.utilizador_atual = {}
 
   if not st.session_state.autenticado:
+    # CORREÇÃO: Usar window.parent.location para forçar a página principal a ler o localStorage
     js_auto_login = """
         <script>
-        const savedEmail = localStorage.getItem('granja_user_email');
-        if (savedEmail && !window.location.search.includes('user_email=')) {
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.set('user_email', savedEmail);
-            window.location.search = urlParams.toString();
+        try {
+            const savedEmail = localStorage.getItem('granja_user_email');
+            if (savedEmail) {
+                const parentLoc = window.parent.location;
+                if (!parentLoc.search.includes('user_email=')) {
+                    const urlParams = new URLSearchParams(parentLoc.search);
+                    urlParams.set('user_email', savedEmail);
+                    parentLoc.search = urlParams.toString();
+                }
+            }
+        } catch (e) {
+            console.error(e);
         }
         </script>
         """
