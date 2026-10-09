@@ -43,7 +43,6 @@ def salvar_utilizador(email, senha, nome, sitio, perfil):
 
 
 def gerenciar_autenticacao():
-  """Controla o login persistente de forma totalmente segura e isolada."""
   if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
@@ -51,7 +50,6 @@ def gerenciar_autenticacao():
     st.session_state.utilizador_atual = {}
 
   if not st.session_state.autenticado:
-    # Script JavaScript para injetar o e-mail guardado no telemóvel na URL
     js_auto_login = """
         <script>
         const savedEmail = localStorage.getItem('granja_user_email');
@@ -64,7 +62,6 @@ def gerenciar_autenticacao():
         """
     components.html(js_auto_login, height=0)
 
-    # Leitura segura do parâmetro na versão atual do Streamlit
     try:
       saved_email = st.query_params.get("user_email", None)
     except:
@@ -80,6 +77,5 @@ def gerenciar_autenticacao():
             "nome": u_data["nome"],
             "sitio": u_data["sitio"],
             "perfil": u_data.get("perfil", "Patrão / Dono"),
-        }
 
   return st.session_state.autenticado
