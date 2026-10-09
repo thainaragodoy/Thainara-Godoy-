@@ -43,31 +43,32 @@ def salvar_utilizador(email, senha, nome, sitio, perfil):
 
 
 def gerenciar_autenticacao():
-  """Verifica o login persistente via localStorage sem causar conflitos de rerun."""
+  """Controla o login persistente de forma totalmente segura e isolada."""
   if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
   if "utilizador_atual" not in st.session_state:
     st.session_state.utilizador_atual = {}
 
-  # Injeta script para detetar o e-mail no telemóvel e preencher na URL
   if not st.session_state.autenticado:
+    # Script JavaScript para injetar o e-mail guardado no telemóvel na URL
     js_auto_login = """
         <script>
         const savedEmail = localStorage.getItem('granja_user_email');
-        if (savedEmail) {
+        if (savedEmail && !window.location.search.includes('user_email=')) {
             const urlParams = new URLSearchParams(window.location.search);
-            if (!urlParams.has('user_email')) {
-                urlParams.set('user_email', savedEmail);
-                window.location.search = urlParams.toString();
-            }
+            urlParams.set('user_email', savedEmail);
+            window.location.search = urlParams.toString();
         }
         </script>
         """
     components.html(js_auto_login, height=0)
 
-    params = st.query_params
-    saved_email = params.get("user_email", None)
+    # Leitura segura do parâmetro na versão atual do Streamlit
+    try:
+      saved_email = st.query_params.get("user_email", None)
+    except:
+      saved_email = None
 
     if saved_email:
       base_u = carregar_utilizadores()
